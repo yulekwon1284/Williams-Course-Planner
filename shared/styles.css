@@ -162,7 +162,7 @@ body.auth-pending .auth-loading{display:block;}
 .password-field input{padding-right:42px;}
 .password-toggle{position:absolute;right:4px;top:0;bottom:0;width:34px;background:none;border:none;cursor:pointer;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;}
 .password-toggle:hover{color:var(--purple-700);}
-.password-toggle svg{width:18px;height:18px;}
+.password-toggle svg{width:20px;height:20px;}
 .auth-card button.primary{width:100%;padding:11px;border:none;border-radius:8px;background:var(--purple-700);color:var(--white);font-weight:700;font-size:14px;cursor:pointer;}
 .auth-card button.primary:hover{background:var(--purple-800);}
 .auth-card button.primary:disabled{opacity:.5;cursor:not-allowed;}
