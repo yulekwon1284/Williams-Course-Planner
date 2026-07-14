@@ -41,15 +41,18 @@ service cloud.firestore {
                       && code.matches('^[A-Z]{2,6}[0-9]{3}$')
                       && request.resource.data.code == code
                       && request.resource.data.keys().hasOnly(
-                           ['code', 'deptKey', 'deptLabel', 'term', 'level', 'majorAtEnrollment', 'enrolledAt', 'notes', 'notesUpdatedAt']
+                           ['code', 'deptKey', 'deptLabel', 'term', 'level', 'majorAtEnrollment', 'enrolledAt', 'journal', 'notesUpdatedAt']
                          )
                       && request.resource.data.enrolledAt == request.time;
-        // Only the notes fields can ever change after creation -- course code, dept, term, level,
-        // and the original enrollment timestamp are locked in at creation time.
+        // Only the journal (one entry per calendar day -- see notes.html) can change after
+        // creation -- course code, dept, term, level, and the original enrollment timestamp are
+        // locked in at creation time. Capped at 400 entries (over a year of daily notes) as a
+        // sanity bound; serverTimestamp() isn't usable inside array elements, so per-entry
+        // timestamps are client-generated and not otherwise validated here.
         allow update: if isOwner(uid)
-                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notes', 'notesUpdatedAt'])
-                      && request.resource.data.notes is string
-                      && request.resource.data.notes.size() < 5000;
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['journal', 'notesUpdatedAt'])
+                      && request.resource.data.journal is list
+                      && request.resource.data.journal.size() < 400;
         allow delete: if isOwner(uid);
       }
 

@@ -101,8 +101,14 @@ homepage automatically.
 usernames/{username}                       { uid }
 users/{uid}                                 { username, createdAt }
 users/{uid}/enrollments/{courseCode}        { code, deptKey, deptLabel, term, level,
-                                               majorAtEnrollment, enrolledAt, notes, notesUpdatedAt }
+                                               majorAtEnrollment, enrolledAt, notesUpdatedAt,
+                                               journal: [{ date: "YYYY-MM-DD", text, updatedAt }] }
+adminEnrollmentLog/{uid}_{courseCode}       { uid, code, deptKey, deptLabel, majorAtEnrollment, enrolledAt }
 ```
+
+`journal` holds one entry per calendar day -- writing more than once on the same day keeps
+updating that day's entry; a new entry is only created once the date rolls over. `notes.html`
+shows today's entry as the editable box and everything else as read-only history underneath.
 
 ## Getting analytics beyond admin.html
 

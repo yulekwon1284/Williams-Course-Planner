@@ -48,11 +48,36 @@
 
   let uid = null;
   const saveTimers = {};
+  // In-memory copy of each course's journal array, keyed by course code -- saves read-modify-write
+  // against this instead of re-fetching from Firestore on every keystroke.
+  const journalCache = {};
 
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
     }[c]));
+  }
+
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  function formatDateLabel(key) {
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  }
+
+  // Old enrollments only ever had a single `notes` string. If a course still has that (and no
+  // `journal` array yet), fold it into one journal entry, dated from when it was last saved, so
+  // existing notes aren't silently lost when this feature shipped.
+  function journalFor(data) {
+    if (Array.isArray(data.journal)) return data.journal;
+    if (data.notes) {
+      const ts = data.notesUpdatedAt && data.notesUpdatedAt.toDate ? data.notesUpdatedAt.toDate() : new Date();
+      const key = `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, "0")}-${String(ts.getDate()).padStart(2, "0")}`;
+      return [{ date: key, text: data.notes, updatedAt: ts.toISOString() }];
+    }
+    return [];
   }
 
   requireLogin(async (user) => {
@@ -71,6 +96,7 @@
       return;
     }
 
+    const today = todayKey();
     let html = "";
     snap.forEach((d) => {
       const data = d.data();
@@ -80,13 +106,31 @@
       const desc = found ? found.course.desc : "";
       const codeLabel = code.replace(/([A-Z]+)(\d+)/, "$1 $2");
       const majorLabel = data.majorAtEnrollment ? (window.DEPTS && DEPTS[data.majorAtEnrollment] ? DEPTS[data.majorAtEnrollment].label : data.majorAtEnrollment) : "an";
+
+      const journal = journalFor(data);
+      journalCache[code] = journal;
+      const todayEntry = journal.find((e) => e.date === today);
+      const pastEntries = journal.filter((e) => e.date !== today).sort((a, b) => b.date.localeCompare(a.date));
+
+      const pastHtml = pastEntries.map((e) => `
+        <div class="nc-journal-entry">
+          <div class="nc-journal-date">${escapeHtml(formatDateLabel(e.date))}</div>
+          <div class="nc-journal-text">${escapeHtml(e.text)}</div>
+        </div>`).join("");
+
       html += `
         <div class="notes-course-card" data-code="${code}">
           <div class="nc-code">${escapeHtml(codeLabel)}</div>
           <div class="nc-name">${escapeHtml(name)}</div>
           <div class="nc-meta">${escapeHtml(data.deptLabel || "")} &middot; ${escapeHtml(data.term || "")} term &middot; enrolled as part of a ${escapeHtml(majorLabel)} plan${desc ? " &middot; " + escapeHtml(desc) : ""}</div>
-          <textarea placeholder="Notes for this course&hellip;" data-code="${code}">${escapeHtml(data.notes || "")}</textarea>
+          <div class="nc-today-label">Today &mdash; ${escapeHtml(formatDateLabel(today))}</div>
+          <textarea placeholder="Notes for this course&hellip;" data-code="${code}">${escapeHtml(todayEntry ? todayEntry.text : "")}</textarea>
           <div class="nc-status" id="status-${cssSafe(code)}">&nbsp;</div>
+          ${pastEntries.length ? `
+          <div class="nc-past">
+            <span class="nc-past-toggle" data-code="${code}">Show ${pastEntries.length} earlier ${pastEntries.length === 1 ? "entry" : "entries"} &darr;</span>
+            <div class="nc-past-entries" id="past-${cssSafe(code)}">${pastHtml}</div>
+          </div>` : ""}
           <button class="nc-unenroll" data-code="${code}" type="button">Remove from My Notes</button>
         </div>`;
     });
@@ -97,6 +141,12 @@
     });
     listEl.querySelectorAll(".nc-unenroll").forEach((btn) => {
       btn.addEventListener("click", () => unenroll(btn.dataset.code));
+    });
+    listEl.querySelectorAll(".nc-past-toggle").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const panel = document.getElementById("past-" + cssSafe(btn.dataset.code));
+        if (panel) panel.classList.toggle("open");
+      });
     });
   }
 
@@ -114,9 +164,21 @@
   async function saveNote(code, text) {
     const statusEl = document.getElementById("status-" + cssSafe(code));
     if (statusEl) statusEl.textContent = "Saving…";
+    const today = todayKey();
+    // Read-modify-write the in-memory journal: replace today's entry if it already exists,
+    // otherwise append a new one -- multiple saves within the same day keep collapsing into a
+    // single entry for that day; the day only rolls over to a new entry once the date changes.
+    const journal = (journalCache[code] || []).filter((e) => e.date !== today);
+    if (text.trim()) {
+      journal.push({ date: today, text, updatedAt: new Date().toISOString() });
+    }
+    journalCache[code] = journal;
     try {
+      // serverTimestamp() isn't supported inside array elements, so each entry's own timestamp is
+      // client-generated (fine for personal note-taking); notesUpdatedAt stays server-authoritative
+      // as a general "this course's notes were touched" marker.
       await updateDoc(doc(db, "users", uid, "enrollments", code), {
-        notes: text,
+        journal,
         notesUpdatedAt: serverTimestamp()
       });
       if (statusEl) statusEl.textContent = "Saved";
@@ -130,6 +192,10 @@
     if (!confirm("Remove this course and its notes from My Notes? This can't be undone.")) return;
     try {
       await deleteDoc(doc(db, "users", uid, "enrollments", code));
+      // Mirrors planner.html's toggleEnroll -- un-enrolling from here must also clear the flat
+      // admin log entry, or admin.html keeps counting a course the student removed.
+      await deleteDoc(doc(db, "adminEnrollmentLog", uid + "_" + code)).catch(() => {});
+      delete journalCache[code];
       await renderList();
     } catch (e) {
       console.error("Could not remove enrollment:", e);

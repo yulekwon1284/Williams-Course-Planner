@@ -1204,7 +1204,7 @@ function renderResults(shouldScroll = true){
           level: found.course.level,
           majorAtEnrollment,
           enrolledAt: serverTimestamp(),
-          notes: "",
+          journal: [],
           notesUpdatedAt: serverTimestamp()
         });
         await setDoc(logRef, {
