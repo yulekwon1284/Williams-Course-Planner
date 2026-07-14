@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Williams College Course &amp; Major Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css?v=3">
+</head>
+<body class="auth-pending">
+<div class="director-credit"><span class="credit-badge"><span class="credit-dot"></span>Directed by <strong>Yule Kwon</strong></span></div>
+<div class="auth-loading">Checking your session&hellip;</div>
+<div class="page-content">
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-top">
+      <div class="eyebrow">Williams College &middot; Class Planning</div>
+      <span class="version-badge">v2.0</span>
+    </div>
+    <h1>Plan your first three years at Williams</h1>
+    <p>Tell me what excites you, what you'd rather avoid, and how ambitious you want to be &mdash; I'll draft three different semester-by-semester paths through junior year, built on Williams' actual distribution, writing, DPE, and QFR requirements across all 37 majors (plus Asian Studies and Cognitive Science as concentrations). Once you see a plan you like, mark courses as <strong>Enrolled</strong> to save them and take notes on them from the <a href="notes.html">My Notes</a> page.</p>
+  </header>
+
+  <div id="quiz"></div>
+
+  <div id="results">
+    <div class="plan-head">
+      <div><h2 id="plan-h2">Your options</h2><div class="sub" id="plan-sub"></div></div>
+      <div class="plan-head-actions">
+        <span class="save-status" id="save-status" onclick="window.__manualSavePlan && window.__manualSavePlan()">Save my plan</span>
+        <span class="edit-answers-link" onclick="editAnswers()">&larr; change an answer</span>
+        <span class="restart-link" onclick="restart()">start over completely</span>
+      </div>
+    </div>
+    <div id="fit-block" class="major-fit" style="display:none;"></div>
+    <div id="major-req-block" class="major-req-block"></div>
+    <div class="tabbar" id="tabbar"></div>
+    <div class="reqbar" id="reqbar"></div>
+    <div class="timeline" id="timeline"></div>
+    <div class="notes" id="plan-notes"></div>
+  </div>
+
+  <footer class="disclaimer">
+    Course data is curated from Williams' official 2026&ndash;27 department catalogs across all 37 majors, plus Asian Studies and Cognitive Science as concentrations. Major requirements and prerequisites are paraphrased and simplified for planning purposes.
+  </footer>
+  <footer class="site-footer">
+    <div class="footer-credit">&copy; 2026 Yule Kwon. All rights reserved.</div>
+    <div class="footer-contact">
+      <a href="tel:+12232057294" aria-label="Call 223-205-7294" title="223-205-7294">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+      </a>
+      <a href="mailto:beberlin1284@gmail.com" aria-label="Email beberlin1284@gmail.com" title="beberlin1284@gmail.com">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+      </a>
+      <a href="https://instagram.com/yuleseoul" target="_blank" rel="noopener" aria-label="Instagram @yuleseoul" title="@yuleseoul">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+      </a>
+    </div>
+  </footer>
+</div>
+</div>
+
+<script src="shared/course-data.js"></script>
+<script>
+/* ============ QUIZ GENERATION STRUC ============ */
+let step=0;
+const answers={hasMajor:null,chosenMajor:"econ",excites:[],avoid:[],pace:null,studyAbroad:null,studyAbroadProgram:null,studyAbroadProgramOther:"",wantsLanguage:null,languageChoice:null,extra:"",background:"",start:"F",tagPrefs:{},deptNotes:{}};
+
+/* Populated from Firestore by the auth/enrollment module script (shared/enrollment.js) once the
+   signed-in user's saved enrollments load — kept as a plain global so this classic script's render
+   functions can read it without knowing anything about Firebase. */
+let enrolledSet=new Set();
+
+/* Every course already carries a `tags` array (e.g. "photography", "gender", "german idealism").
+   getDeptSubtopics surfaces those as pickable subtopics so interest can be expressed below the
+   department level — that's what lets "Philosophy" split into "German Idealism" vs "Feminist Ethics". */
+function getDeptSubtopics(deptKey){
+  const d=DEPTS[deptKey];
+  const set=new Set();
+  Object.values(d.courses).forEach(c=>(c.tags||[]).forEach(t=>set.add(t)));
+  return [...set].sort().map(t=>({v:t,l:t.replace(/\b\w/g,ch=>ch.toUpperCase())}));
+}
+
+const QUESTIONS=[
+ {id:"background",type:"text",title:"Tell me a bit about yourself academically.",
+  sub:"Any specific majors you are pursuing? Mention if you are tracking Pre-Med, STEM lab pathways, Business paths, or Applied Natural Sciences. Also name specific niche interests if you have them (e.g. \"German Idealism,\" \"street photography\") — we scan this text for course matches too, on top of the topic picker later on.",
+  placeholder:"e.g. I am a Pre-Med track student who wants to declare Environmental Science, but I want to retain visual media or arts electives..."},
+ {id:"hasMajor",type:"single",title:"Do you already have a major in mind?",sub:"",
+  options:[{v:"yes",l:"Yes — I know (or am pretty sure)"},{v:"no",l:"Not yet — help me explore"}]},
+ {id:"chosenMajor",type:"single",title:"Which major?",sub:"Pick your academic major trajectory from this universal catalog layer.",
+  showIf:{hasMajor:"yes"},
+  options:DEPT_ORDER.filter(k=>!DEPTS[k].concentration).map(k=>({v:k,l:DEPTS[k].label}))},
+ {id:"excites",type:"multi",title:"Which subjects genuinely excite you?",sub:"Pick as many as apply. For each one you pick, next you'll get a chance to say exactly which topics inside it you love or want to skip — so \"Philosophy\" doesn't just mean anything Philosophy-shaped.",
+  options:DEPT_ORDER.map(k=>({v:k,l:DEPTS[k].label}))},
+ {id:"avoid",type:"multi",title:"Anything you'd like to avoid, or take as little of as possible?",sub:"",
+  options:[
+    {v:"hardstem",l:"Heavy theoretical advanced mathematical modeling (Physics, dense CS proof blocks, advanced Calculus/Stats)"},
+    {v:"foreignlang",l:"Foreign language coursework"},
+    {v:"studio",l:"Studio / hands-on art-making"},
+    {v:"writing",l:"Heavy writing-intensive courses"},
+    {v:"none",l:"No particular dealbreakers"}
+  ]},
+ {id:"wantsLanguage",type:"single",title:"Would you like to study a new foreign language?",
+  sub:"If you pick a language, I'll weave a proper Elementary → Intermediate → Advanced sequence into your plan.",
+  options:[{v:"yes",l:"Yes — I'd like to learn a new language"},{v:"no",l:"No — skip foreign language coursework"}]},
+ {id:"languageChoice",type:"single",title:"Which language?",sub:"This determines which language sequence gets scheduled into your plan.",
+  showIf:{wantsLanguage:"yes"},
+  options:Object.keys(LANGUAGES).map(k=>({v:k,l:LANGUAGES[k].label}))},
+ {id:"pace",type:"single",title:"How do you want to balance challenge and breathing room?",sub:"",
+  options:[
+    {v:"light",l:"Lighter & exploratory — leave room to breathe"},
+    {v:"balanced",l:"Balanced — a healthy mix"},
+    {v:"challenge",l:"Bring the challenge — progressive upper-level difficulty"}
+  ]},
+ {id:"studyAbroad",type:"single",title:"Thinking about studying abroad during junior year?",
+  sub:"Timelines can account for a specific single semester away or a full immersive academic year abroad.",
+  options:[
+    {v:"no",l:"No — staying on campus all three years"},
+    {v:"fall",l:"Yes — fall semester of junior year away"},
+    {v:"spring",l:"Yes — spring semester of junior year away"},
+    {v:"full",l:"Yes — full year abroad"}
+  ]},
+ {id:"studyAbroadProgram",type:"single",title:"Which study abroad program?",
+  sub:"Williams runs two of its own programs, and also approves dozens of programs abroad run by outside providers. Whichever you pick, departments generally require your major requirements to be substantially on track before they'll sign off — I'll flag that in your plan notes.",
+  options:[
+    {v:"oxford",l:"Williams-Exeter Programme at Oxford"},
+    {v:"mystic",l:"Williams-Mystic (Maritime Studies Program)"},
+    {v:"other",l:"Another approved program abroad (IES, CIEE, SIT, School for Field Studies, direct exchange, etc.)"},
+    {v:"undecided",l:"Not sure yet — still deciding"}
+  ]},
+ {id:"studyAbroadProgramOther",type:"text",title:"Which program, if you know it?",
+  sub:"Optional — e.g. \"IES Abroad Barcelona\" or \"direct exchange in Japan.\" This just tailors the advisory note below; it won't change which courses get scheduled.",
+  showIf:{studyAbroadProgram:"other"},
+  placeholder:"Optional..."},
+ {id:"start",type:"single",title:"Which semester are you starting?",sub:"",
+  options:[{v:"F",l:"Fall 2026"},{v:"S",l:"Spring 2027"}]},
+ {id:"extra",type:"text",title:"Anything else I should know?",sub:"Optional — add parameters here.",placeholder:"Optional..."}
+];
+
+function subtopicQuestionsFor(){
+  return DEPT_ORDER.filter(k=>answers.excites.includes(k)).map(k=>{
+    const d=DEPTS[k];
+    return {id:"subtopics_"+k,type:"tagpick",dept:k,
+      title:`Inside ${d.label}, what specifically pulls you in?`,
+      sub:`Tap a topic once to flag "more of this," again for "less of this," a third time to clear it. This is what separates German Idealism from Feminist Ethics, or Photography from an Art History survey — be as picky as you want.`,
+      tags:getDeptSubtopics(k)};
+  });
+}
+function visibleQuestions(){
+  const base=QUESTIONS.filter(q=>{
+    if(q.id==="wantsLanguage" && answers.avoid.includes("foreignlang")) return false;
+    if(q.id==="studyAbroadProgram" && (!answers.studyAbroad || answers.studyAbroad==="no")) return false;
+    if(!q.showIf) return true;
+    for(const k in q.showIf){ if(answers[k]!==q.showIf[k]) return false; }
+    return true;
+  });
+  const idx=base.findIndex(q=>q.id==="excites");
+  if(idx===-1) return base;
+  return [...base.slice(0,idx+1), ...subtopicQuestionsFor(), ...base.slice(idx+1)];
+}
+
+/* ============ SCROLL LOCK HELPER ============
+   Re-renders replace big chunks of innerHTML. If the resulting content is
+   shorter than before, the browser clamps scrollY, which reads as the page
+   "jumping" on every click. Snapshot scrollY, run the render, restore it. */
+function withScrollPreserved(fn){
+  const y=window.scrollY;
+  fn();
+  window.scrollTo(0,y);
+}
+
+function renderQuiz(){
+  const qs=visibleQuestions();
+  if(step>=qs.length){ generateAllPlans(); return; }
+  const q=qs[step];
+  const container=document.getElementById("quiz");
+  let body="";
+  if(q.type==="text"){
+    body=`<textarea class="freetext" id="freetext-${q.id}" placeholder="${q.placeholder||''}">${answers[q.id]||''}</textarea>`;
+  } else if(q.type==="tagpick"){
+    body=`<div class="tagpick-legend">★ more of this &nbsp;·&nbsp; ✕ less of this &nbsp;·&nbsp; blank = no strong opinion</div>`+
+      `<div class="options single-col">`+q.tags.map(t=>{
+        const key=q.dept+"::"+t.v;
+        const state=answers.tagPrefs[key];
+        const stateLabel=state==="love"?"★ more of this":state==="skip"?"✕ less of this":"tap to flag";
+        return `<div class="opt tagopt ${state==='love'?'tag-love':''} ${state==='skip'?'tag-skip':''}" onclick="cycleTag('${q.dept}','${t.v}')"><span>${t.l}</span><span class="tag-state">${stateLabel}</span></div>`;
+      }).join("")+`</div>`+
+      `<textarea class="freetext" style="margin-top:14px;" id="deptnote-${q.dept}" placeholder="Anything more specific not listed above? e.g. &quot;German Idealism — Kant and Hegel especially&quot; or &quot;street photography, not studio portraiture&quot;">${answers.deptNotes[q.dept]||''}</textarea>`;
+  } else {
+    const isMulti=q.type==="multi";
+    const selected=isMulti?answers[q.id]:[answers[q.id]];
+    body=`<div class="options ${q.options.length<=2?'single-col':''}">`+q.options.map(o=>{
+      const isSel=selected.includes(o.v);
+      return `<div class="opt ${isMulti?'multi':'single'} ${isSel?'selected':''}" onclick="choose('${q.id}','${o.v}',${isMulti})"><span class="box"></span><span>${o.l}</span></div>`;
+    }).join("")+`</div>`;
+  }
+  const canAdvance = (q.type==="text" || q.type==="tagpick") ? true : (q.type==="multi" ? true : answers[q.id]!==null);
+  container.innerHTML=`
+    <div class="card">
+      <div class="q-num">Question ${step+1} of ${qs.length}</div>
+      <div class="q-title">${q.title}</div>
+      ${q.sub?`<div class="q-sub">${q.sub}</div>`:''}
+      ${body}
+      <div class="progress">${qs.map((_,i)=>`<div class="dot ${i<step?'done':i===step?'active':''}"></div>`).join("")}</div>
+      <div class="actions">
+        <button class="ghost" onclick="prevStep()" ${step===0?'style="visibility:hidden"':''}>&larr; Back</button>
+        <button class="primary" ${canAdvance?'':'disabled'} onclick="nextStep()">${step===qs.length-1?'Build my plans':'Next'}</button>
+      </div>
+    </div>`;
+}
+function choose(qid,val,isMulti){
+  if(isMulti){
+    const arr=answers[qid]; const idx=arr.indexOf(val);
+    if(idx>-1) arr.splice(idx,1); else arr.push(val);
+  } else { answers[qid]=val; }
+  withScrollPreserved(renderQuiz);
+}
+function cycleTag(dept,tag){
+  const key=dept+"::"+tag;
+  const cur=answers.tagPrefs[key];
+  if(cur==="love") answers.tagPrefs[key]="skip";
+  else if(cur==="skip") delete answers.tagPrefs[key];
+  else answers.tagPrefs[key]="love";
+  withScrollPreserved(renderQuiz);
+}
+function nextStep(){
+  const qs=visibleQuestions();
+  const q=qs[step];
+  if(q && q.type==="text"){ answers[q.id]=document.getElementById("freetext-"+q.id).value; }
+  if(q && q.type==="tagpick"){
+    const el=document.getElementById("deptnote-"+q.dept);
+    if(el) answers.deptNotes[q.dept]=el.value;
+  }
+  step++; renderQuiz();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function prevStep(){ if(step>0){ step--; renderQuiz(); window.scrollTo({top:0,behavior:"smooth"}); } }
+/* Sends the user back into the quiz to revise answers, WITHOUT resetting them (unlike restart()) --
+   lands on the last question so the existing "Back" button walks them backward through their
+   previously-given answers one at a time, per the requested revise-in-place flow. */
+function editAnswers(){
+  const qs=visibleQuestions();
+  step=Math.max(0,qs.length-1);
+  document.getElementById("results").style.display="none";
+  document.getElementById("quiz").style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+  renderQuiz();
+}
+function restart(){
+  step=0;
+  window.bannedBySlot = {};
+  customSwapOpen=null; customSwapResults=null; customSwapQuery={prefix:"",text:""}; customSwapEmptyMsg=null;
+  Object.assign(answers,{hasMajor:null,chosenMajor:"econ",excites:[],avoid:[],pace:null,studyAbroad:null,studyAbroadProgram:null,studyAbroadProgramOther:"",wantsLanguage:null,languageChoice:null,extra:"",background:"",start:"F",tagPrefs:{},deptNotes:{}});
+  document.getElementById("results").style.display="none";
+  document.getElementById("quiz").style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+  renderQuiz();
+}
+
+function scoreMajorFit(){
+  const bg=(answers.background||"").toLowerCase();
+  const avoidHard=answers.avoid.includes("hardstem");
+  const avoidStudio=answers.avoid.includes("studio");
+  const avoidLang=answers.avoid.includes("foreignlang");
+
+  return DEPT_ORDER.map(k=>{
+    const d=DEPTS[k];
+    let score=0;
+    if(answers.excites.includes(k)) score+=4;
+    d.keywords.forEach(kw=>{ if(bg.includes(kw.split(" ")[0])) score+=1; });
+
+    // Penalize the new expanded math/stats/neuro fields if Hard STEM is avoided
+    if(avoidHard && (k==="phys"||k==="csci"||k==="chem"||k==="biol"||k==="math"||k==="stat"||k==="neur")) score-=5;
+    if(avoidStudio && (k==="arts"||k==="arth")) score-=4;
+    if(avoidLang && (k==="comp"||k==="asia")) score-=1;
+
+    return {key:k,label:d.label,score,summary:d.majorSummary};
+  }).sort((a,b)=>b.score-a.score);
+}
+
+function courseKeyToDept(code){
+  for(const k of DEPT_ORDER){ if(DEPTS[k].courses[code]) return k; }
+  return null;
+}
+function prereqSatisfied(prereq,completedCodes){
+  if(!prereq) return true;
+  return completedCodes.has(prereq);
+}
+function termOk(courseTerm,semTerm){ return courseTerm==="FS"||courseTerm===semTerm; }
+const DIV_KEY={I:"D1",II:"D2",III:"D3"};
+
+/* Among several candidates tied for the top score, rotate which one wins using a
+   per-plan-variant seed (offset by semester) instead of always taking the first in
+   catalog order — otherwise every "avoid X" student gets steered into the same
+   filler department (e.g. always Psychology for Div III), and all three plan
+   variants converge on identical elective picks whenever nothing else breaks the tie. */
+function pickTiebreak(candidates,seed){
+  if(!candidates.length) return undefined;
+  const topScore=candidates[0].score;
+  const tied=candidates.filter(it=>it.score===topScore);
+  return tied[((seed%tied.length)+tied.length)%tied.length];
+}
+
+/* Free-text answers (background/extra/per-dept notes) get scanned for known topic tags too,
+   so typing "photography" carries real weight even if Art History/Studio Art was never
+   picked as an excited department. */
+function freeTextBlob(){
+  return ((answers.background||"")+" "+(answers.extra||"")+" "+Object.values(answers.deptNotes||{}).join(" ")).toLowerCase();
+}
+function buildCandidatePool(chosenMajorKey,majorWeight,exciteWeight){
+  const avoidHard=answers.avoid.includes("hardstem");
+  const avoidStudio=answers.avoid.includes("studio");
+  const avoidWriting=answers.avoid.includes("writing");
+  const excites=new Set(answers.excites);
+  const blob=freeTextBlob();
+  const extraKeys=(answers.wantsLanguage==="yes" && LANGUAGES[answers.languageChoice]) ? [answers.languageChoice] : [];
+  let pool=[];
+  DEPT_ORDER.concat(extraKeys).forEach(dk=>{
+    const d=deptOf(dk);
+    const isOwnMajor = dk===chosenMajorKey;
+    Object.keys(d.courses).forEach(code=>{
+      const c=d.courses[code];
+      const isBackbone = d.backbone && d.backbone.includes(code);
+
+      let tagBonus=0, hasSkip=false, hasLove=false;
+      (c.tags||[]).forEach(tag=>{
+        const explicit=answers.tagPrefs[dk+"::"+tag];
+        if(explicit==="love"){ tagBonus+=5; hasLove=true; }
+        else if(explicit==="skip"){ tagBonus-=8; hasSkip=true; }
+        else if(tag.length>2 && blob.includes(tag.toLowerCase())){ tagBonus+=3; hasLove=true; }
+      });
+      // A course explicitly flagged "skip" is dropped from the pool entirely (not just
+      // deprioritized) unless it's a required backbone course for the chosen major.
+      if(hasSkip && !isBackbone) return;
+
+      // "Avoid" preferences deprioritize matching courses instead of deleting them from
+      // the pool outright. A hard exclusion could leave a real graduation requirement
+      // (Div III, WS, etc.) unsatisfiable purely because every remaining option happened
+      // to be flagged; a heavy score penalty instead means a gentler alternative always
+      // wins when one exists, but the requirement can still be closed as a last resort.
+      let avoidPenalty=0, avoided=false;
+      if(avoidHard && c.hardstem && !isOwnMajor){ avoidPenalty-=9; avoided=true; }
+      if(avoidStudio && dk==="arts" && !isOwnMajor){ avoidPenalty-=9; avoided=true; }
+      if(avoidWriting && (c.attrs||[]).includes("WS") && !isOwnMajor){ avoidPenalty-=9; avoided=true; }
+
+      let score=0;
+      if(isOwnMajor) score+=majorWeight;
+      if(excites.has(dk)) score+=exciteWeight;
+      if(isBackbone) score+=3;
+      score+=tagBonus;
+      score+=avoidPenalty;
+      pool.push({code,dept:dk,deptLabel:d.label,div:d.div,course:c,score,loveMatch:hasLove,avoided});
+    });
+  });
+  pool.sort((a,b)=>b.score-a.score);
+  return pool;
+}
+
+function buildOnePlan(effectiveMajor,cfg){
+  const pool=buildCandidatePool(effectiveMajor,cfg.majorWeight,cfg.exciteWeight);
+  const excites=new Set(answers.excites);
+  const semCount=6;
+  const terms=[]; let t=answers.start;
+  for(let i=0;i<semCount;i++){ terms.push(t); t=(t==="F")?"S":"F"; }
+
+  const abroadIdx=new Set();
+  if(answers.studyAbroad==="fall") abroadIdx.add(4);
+  else if(answers.studyAbroad==="spring") abroadIdx.add(5);
+  else if(answers.studyAbroad==="full"){ abroadIdx.add(4); abroadIdx.add(5); }
+
+  const wantsLang=answers.wantsLanguage==="yes" && !!LANGUAGES[answers.languageChoice];
+  const langKey=wantsLang?answers.languageChoice:null;
+  const langDept=wantsLang?LANGUAGES[langKey]:null;
+  const langCodes=langDept?Object.keys(langDept.courses):[];
+  const langGoal=langCodes.length;
+
+  const majorDeptObj=DEPTS[effectiveMajor];
+  const majorGoal=Math.min(majorDeptObj.reqCount||9, Object.keys(majorDeptObj.courses).length);
+
+  const scheduled=new Set();
+  const completedCodes=new Set();
+  const completedDeptCounts={};
+  const divCount={D1:0,D2:0,D3:0};
+  let wsCount=0,dpeCount=0,qfrCount=0,majorCount=0,langCount=0;
+  const semesterPlans=[];
+  const qfrDeadlineIdx = abroadIdx.has(4)&&abroadIdx.has(5) ? 3 : semCount-1;
+
+  function remainingNonAbroadFrom(startIdx){
+    let cnt=0;
+    for(let i=startIdx;i<semCount;i++){ if(!abroadIdx.has(i)) cnt++; }
+    return cnt;
+  }
+
+  // Each plan variant can shape its own per-term major-course ceiling (Rigorous Depth
+  // ramps from 2 to 3 partway through), falling back to a flat cap of 2 otherwise.
+  function semMajorCap(semIdx){ return cfg.semMajorCap ? cfg.semMajorCap(semIdx) : 2; }
+  // A cross-listed course (e.g. "Philosophy and Modern Physics" registered as PHYS 312)
+  // can satisfy a major or division requirement under its alternate department instead
+  // of its catalog home department. counts-as-major below asks "if a student registered
+  // this under whichever prefix helps their major, would it match?" — used so the
+  // per-term major cap and major-count tallying stay accurate even when a course is
+  // being claimed via its alternate listing rather than its home one.
+  function countsAsMajor(item){
+    return item.dept===effectiveMajor || (item.course.cross||[]).some(cx=>cx.deptKey===effectiveMajor);
+  }
+
+  function candidateAllowed(item, semIdx){
+    if(countsAsMajor(item) && majorCount>=cfg.majorCap) return false;
+
+    const lvl = item.course.level;
+    if(semIdx <= 1 && lvl >= 300) return false;
+    if(semIdx <= 3 && lvl >= 400) return false;
+
+    // Cap how many major-department courses land in a single term, so a semester
+    // doesn't turn into wall-to-wall major coursework even when slots are open.
+    if(countsAsMajor(item)){
+      const semMajorCount=semesterPlans[semIdx].filter(it=>countsAsMajor(it)).length;
+      if(semMajorCount>=semMajorCap(semIdx)) return false;
+    }
+
+    return true;
+  }
+
+  function tryScheduleInto(semIdx,item){
+    const {code,dept,course}=item;
+    if(scheduled.has(code)) return false;
+    if(!termOk(course.term,terms[semIdx])) return false;
+    if(!prereqSatisfied(course.prereq,completedCodes)) return false;
+    if(!candidateAllowed(item, semIdx)) return false;
+
+    // If this slot claimed the course specifically via its cross-listed registration
+    // (see registeredAs, set by the target cascade below), credit the department and
+    // division that registration actually counts toward — not the catalog's home entry.
+    const effDept = item.registeredAs ? item.registeredAs.deptKey : dept;
+    const effDiv = item.registeredAs ? item.registeredAs.div : deptOf(dept).div;
+
+    semesterPlans[semIdx].push(item);
+    scheduled.add(code);
+    completedDeptCounts[effDept]=(completedDeptCounts[effDept]||0)+1;
+    if(effDept===effectiveMajor) majorCount++;
+    if(effDept===langKey) langCount++;
+    const divKey=DIV_KEY[effDiv];
+    divCount[divKey]++;
+    if(course.attrs.includes("WS")) wsCount++;
+    if(course.attrs.includes("DPE")) dpeCount++;
+    if(course.attrs.includes("QFR")) qfrCount++;
+    return true;
+  }
+
+  // A required course can be gated behind a prerequisite from another department (e.g. a Statistics
+  // backbone course needing Linear Algebra). Walk down to the deepest not-yet-met link in that chain
+  // and schedule it now, so cross-department chains bootstrap one hop per semester instead of stalling forever.
+  function scheduleUnmetPrereqChain(code, semIdx){
+    if(scheduled.has(code) || completedCodes.has(code)) return false;
+    const found=findCourseGlobal(code);
+    if(!found) return false;
+    const c=found.course;
+    if(c.prereq && !completedCodes.has(c.prereq) && !scheduled.has(c.prereq)){
+      return scheduleUnmetPrereqChain(c.prereq, semIdx);
+    }
+    const item={code, dept:found.deptKey, deptLabel:found.deptObj.label, div:found.deptObj.div, course:c};
+    return tryScheduleInto(semIdx, item);
+  }
+
+  // Follow Passions treats first year as a sampler when the student hasn't committed to a
+  // major yet: no forced major backbone courses, just breadth across departments.
+  const isExploring = answers.hasMajor!=="yes";
+  function isExploreYear(semIdx){ return !!(cfg.exploreFirstYear && isExploring && semIdx<=1); }
+
+  for(let s=0;s<semCount;s++){
+    semesterPlans.push([]);
+    if(abroadIdx.has(s)){ continue; }
+    let slots=4;
+
+    if(!isExploreYear(s)){
+      for(const code of DEPTS[effectiveMajor].backbone){
+        if(slots<=0) break;
+        if(scheduled.has(code)) continue;
+        const c=DEPTS[effectiveMajor].courses[code];
+        const poolMatch=pool.find(p=>p.code===code);
+        const item={code,dept:effectiveMajor,deptLabel:DEPTS[effectiveMajor].label,div:DEPTS[effectiveMajor].div,course:c,loveMatch:poolMatch?poolMatch.loveMatch:false};
+        if(tryScheduleInto(s,item)){ slots--; continue; }
+        if(slots>0 && c.prereq && !completedCodes.has(c.prereq) && !scheduled.has(c.prereq)){
+          if(scheduleUnmetPrereqChain(c.prereq, s)) slots--;
+        }
+      }
+    }
+
+    // Weave in the next unclaimed course of the chosen language sequence, one per semester.
+    if(wantsLang && slots>0){
+      for(const code of langCodes){
+        if(scheduled.has(code)) continue;
+        const c=langDept.courses[code];
+        const item={code,dept:langKey,deptLabel:langDept.label,div:langDept.div,course:c};
+        if(tryScheduleInto(s,item)){ slots--; break; }
+      }
+    }
+
+    // Candidates for a single named target, used by the priority cascade below. A
+    // cross-listed course (see the `cross` field in the catalog) can satisfy a MAJOR
+    // or DIV target through its alternate registration even when its catalog-home
+    // department/division doesn't match — e.g. "Philosophy and Modern Physics" can
+    // close a Div III requirement if registered as PHYS 312 instead of PHIL 312.
+    function candidatesForTarget(target){
+      return pool.filter(item=>{
+        if(scheduled.has(item.code)) return false;
+        if(!termOk(item.course.term,terms[s])) return false;
+        if(!prereqSatisfied(item.course.prereq,completedCodes)) return false;
+        if(!candidateAllowed(item, s)) return false;
+        const attrs=item.course.attrs; const divKey=DIV_KEY[item.div];
+        const crossList=item.course.cross||[];
+        if(target==="MAJOR") return item.dept===effectiveMajor || crossList.some(cx=>cx.deptKey===effectiveMajor);
+        if(target==="PASSION") return item.dept!==effectiveMajor && (excites.has(item.dept) || item.loveMatch);
+        if(target==="QFR") return attrs.includes("QFR");
+        if(target.startsWith("DIV:")){
+          const wantKey=target.split(":")[1];
+          if(divKey===wantKey) return true;
+          return crossList.some(cx=>DIV_KEY[deptOf(cx.deptKey).div]===wantKey);
+        }
+        if(target==="WS") return attrs.includes("WS");
+        if(target==="DPE") return attrs.includes("DPE");
+        return excites.has(item.dept) || item.dept===effectiveMajor || item.loveMatch; // GENERIC
+      });
+    }
+
+    // If a candidate was only pulled in for a target through its cross-listing (its
+    // catalog-home department/division didn't itself satisfy the target), figure out
+    // which alternate registration to credit it under.
+    function crossRegistrationFor(item,target){
+      const crossList=item.course.cross||[];
+      if(target==="MAJOR"){
+        if(item.dept===effectiveMajor) return null;
+        return crossList.find(cx=>cx.deptKey===effectiveMajor) || null;
+      }
+      if(target && target.startsWith("DIV:")){
+        const wantKey=target.split(":")[1];
+        if(DIV_KEY[item.div]===wantKey) return null;
+        return crossList.find(cx=>DIV_KEY[deptOf(cx.deptKey).div]===wantKey) || null;
+      }
+      return null;
+    }
+
+    let guard=0;
+    while(slots>0 && guard<500){
+      guard++;
+      const remainingSem=remainingNonAbroadFrom(s);
+      const majorCapGoal=Math.min(majorGoal,cfg.majorCap);
+      const neededMajor=majorCapGoal-majorCount;
+      const exploring=isExploreYear(s);
+      const semHasPassionElective=semesterPlans[s].some(it=>it.dept!==effectiveMajor && (excites.has(it.dept)||it.loveMatch));
+
+      // Only force a major course this slot if skipping it would make the major goal
+      // mathematically unreachable given the remaining semesters' per-term cap — not
+      // merely "behind a naive 1-per-semester pace." The old 1:1 check tripped almost
+      // immediately for any major needing 8+ courses, which crowded distribution
+      // requirements (Div I/II/III, WS, DPE) out of the early, slack-filled semesters
+      // and pushed them later than necessary.
+      const capRemaining=Math.max(0,remainingSem-1)*semMajorCap(s);
+      const majorUrgent = !exploring && neededMajor>0 && neededMajor>capRemaining;
+
+      // Ordered wishlist of what this slot should try to satisfy. Div categories are
+      // sorted by how far behind they are (fewest completed first) so whichever one is
+      // hardest to fill — e.g. Div III when heavy STEM is being avoided — gets first
+      // crack at open slots each semester instead of being left until last, letting a
+      // motivated student clear all nine distribution courses in the first few terms
+      // and spend the rest of their time on their major and passions.
+      const targetOrder=[];
+      if(majorUrgent) targetOrder.push("MAJOR");
+      if(cfg.passionElective && !exploring && !semHasPassionElective) targetOrder.push("PASSION");
+      if(qfrCount<1 && s>=qfrDeadlineIdx-1) targetOrder.push("QFR");
+      ["D1","D2","D3"].filter(k=>divCount[k]<3).sort((a,b)=>divCount[a]-divCount[b]).forEach(k=>targetOrder.push("DIV:"+k));
+      if(wsCount<2) targetOrder.push("WS");
+      if(dpeCount<1) targetOrder.push("DPE");
+
+      const seed=(cfg.seed||0)+s;
+      let candidate=null, chosenTarget=null;
+
+      if(targetOrder.length===0 && (cfg.breadthMode || exploring)){
+        const eligible=pool.filter(item=>!scheduled.has(item.code) && termOk(item.course.term,terms[s]) && prereqSatisfied(item.course.prereq,completedCodes) && candidateAllowed(item, s));
+        if(eligible.length){
+          const minCount=Math.min(...eligible.map(it=>completedDeptCounts[it.dept]||0));
+          const atMin=eligible.filter(it=>(completedDeptCounts[it.dept]||0)===minCount).sort((a,b)=>b.score-a.score);
+          candidate=pickTiebreak(atMin,seed);
+          if(candidate) candidate.registeredAs=null;
+        }
+      } else {
+        // Walk the wishlist in priority order. If the top target has no legal candidate
+        // this semester (e.g. the major's per-term cap is already hit, or every
+        // remaining course in that department needs a prerequisite not taken yet),
+        // fall through to the next real priority instead of abandoning intent and
+        // grabbing whatever scores highest overall — that silent collapse was how a
+        // "finish the major fast" push could quietly steal the slot that should have
+        // gone to a lagging Div III requirement.
+        for(const t of targetOrder.concat(["GENERIC"])){
+          candidate=pickTiebreak(candidatesForTarget(t),seed);
+          if(candidate){ chosenTarget=t; break; }
+        }
+      }
+      if(candidate && chosenTarget==="PASSION") candidate.passionPick=true;
+      if(candidate && chosenTarget){
+        const cx=crossRegistrationFor(candidate,chosenTarget);
+        candidate.registeredAs = cx ? {code:cx.code,deptKey:cx.deptKey,deptLabel:deptOf(cx.deptKey).label,div:deptOf(cx.deptKey).div} : null;
+      }
+      if(!candidate){
+        const fallback=pool.filter(item=>!scheduled.has(item.code) && termOk(item.course.term,terms[s]) && prereqSatisfied(item.course.prereq,completedCodes) && candidateAllowed(item, s));
+        candidate=pickTiebreak(fallback,seed);
+        if(candidate) candidate.registeredAs=null;
+      }
+      if(!candidate) break;
+      if(tryScheduleInto(s,candidate)) slots--; else break;
+    }
+    scheduled.forEach(code=>completedCodes.add(code));
+  }
+
+  const majorCapGoalFinal=Math.min(majorGoal,cfg.majorCap);
+  const majorFinished = majorCount>=majorCapGoalFinal;
+
+  return {semesterPlans,terms,abroadIdx,
+    reqStatus:{divCount,wsCount,dpeCount,qfrCount,majorCount,majorGoal:majorCapGoalFinal,majorFinished,langCount,langGoal,wantsLang}};
+}
+
+/* ============ INTERACTIVE COURSE SWAP ENGINE ============ */
+// Recomputes every requirement tally from the actual scheduled courses (respecting
+// cross-listed registrations) — shared by the random Swap button and the "Other"
+// search-and-pick flow so both leave reqStatus in a consistent, honest state.
+function recomputeReqStatus(activePlanData){
+  const reCount = {D1:0,D2:0,D3:0};
+  let reWs=0, reDpe=0, reQfr=0, reMajor=0, reLang=0;
+  activePlanData.semesterPlans.forEach((sem, sIdx) => {
+    if(activePlanData.abroadIdx.has(sIdx)) return;
+    sem.forEach(it => {
+      const effDept = it.registeredAs ? it.registeredAs.deptKey : it.dept;
+      const effDiv = it.registeredAs ? it.registeredAs.div : deptOf(it.dept).div;
+      reCount[DIV_KEY[effDiv]]++;
+      if(it.course.attrs.includes("WS")) reWs++;
+      if(it.course.attrs.includes("DPE")) reDpe++;
+      if(it.course.attrs.includes("QFR")) reQfr++;
+      if(effDept===EFFECTIVE_MAJOR) reMajor++;
+      if(LANGUAGES[it.dept]) reLang++;
+    });
+  });
+  activePlanData.reqStatus.divCount = reCount;
+  activePlanData.reqStatus.wsCount = reWs;
+  activePlanData.reqStatus.dpeCount = reDpe;
+  activePlanData.reqStatus.qfrCount = reQfr;
+  activePlanData.reqStatus.majorCount = reMajor;
+  activePlanData.reqStatus.majorFinished = reMajor >= activePlanData.reqStatus.majorGoal;
+  activePlanData.reqStatus.langCount = reLang;
+}
+
+function swapCourse(semIdx, oldCode) {
+  const activePlanData = PLAN_VARIANTS[activeTab].plan;
+  const currentSemesterList = activePlanData.semesterPlans[semIdx];
+
+  const targetIdx = currentSemesterList.findIndex(it => it.code === oldCode);
+  if(targetIdx === -1) return;
+
+  // Refuse the swap if a later semester already relies on this course as a prerequisite —
+  // removing it would silently strand that course without its requirement met.
+  const isPrereqForLaterCourse = activePlanData.semesterPlans.some((sem, i) =>
+    i > semIdx && sem.some(it => it.course.prereq === oldCode));
+  if (isPrereqForLaterCourse) return;
+
+  // Each slot (tab + semester + position) remembers what's already been tried in it,
+  // so repeat clicks cycle through fresh alternatives instead of looping back to the
+  // last rejected course. This is scoped per-slot rather than a single global ban list —
+  // otherwise every swap anywhere in the plan permanently removed a course from
+  // consideration everywhere else too, and after enough swaps the Swap button would
+  // run out of eligible alternatives and silently stop working.
+  if(!window.bannedBySlot) window.bannedBySlot = {};
+  const slotKey = activeTab+"_"+semIdx+"_"+targetIdx;
+  if(!window.bannedBySlot[slotKey]) window.bannedBySlot[slotKey] = new Set();
+  const slotBanned = window.bannedBySlot[slotKey];
+  slotBanned.add(oldCode);
+
+  const rejectedItem = currentSemesterList[targetIdx];
+  // If the rejected course was counted via a cross-listed registration (e.g. "Philosophy
+  // and Modern Physics" registered as PHYS 312 to satisfy Div III), match replacements
+  // against what it was actually credited as, not its catalog-home department/division.
+  const rejectedDept = rejectedItem.registeredAs ? rejectedItem.registeredAs.deptKey : rejectedItem.dept;
+  const rejectedDiv = rejectedItem.registeredAs ? rejectedItem.registeredAs.div : rejectedItem.div;
+  const pool = buildCandidatePool(EFFECTIVE_MAJOR, 6, 4);
+
+  const matchesInPlay = new Set();
+  activePlanData.semesterPlans.forEach(sem => sem.forEach(it => matchesInPlay.add(it.code)));
+
+  // Codes completed in strictly earlier semesters — needed so a swap can't place
+  // a course whose prerequisite hasn't actually been taken yet by this point in the plan.
+  const priorCodes = new Set();
+  activePlanData.semesterPlans.forEach((sem, i) => { if (i < semIdx) sem.forEach(it => priorCodes.add(it.code)); });
+
+  function levelAllowedForSemester(lvl) {
+    if (semIdx <= 1 && lvl >= 300) return false;
+    if (semIdx <= 3 && lvl >= 400) return false;
+    return true;
+  }
+
+  let alternativeCourse = pool.find(item => {
+    if (matchesInPlay.has(item.code) || slotBanned.has(item.code)) return false;
+    if (!termOk(item.course.term, activePlanData.terms[semIdx])) return false;
+    if (!levelAllowedForSemester(item.course.level)) return false;
+    if (!prereqSatisfied(item.course.prereq, priorCodes)) return false;
+
+    if (rejectedDept === EFFECTIVE_MAJOR && item.dept !== EFFECTIVE_MAJOR) return false;
+    if (item.div !== rejectedDiv) return false;
+
+    for (const attr of rejectedItem.course.attrs) {
+      if (!item.course.attrs.includes(attr)) return false;
+    }
+    return true;
+  });
+
+  if (!alternativeCourse) {
+    alternativeCourse = pool.find(item => {
+      if (matchesInPlay.has(item.code) || slotBanned.has(item.code)) return false;
+      if (!termOk(item.course.term, activePlanData.terms[semIdx])) return false;
+      if (!levelAllowedForSemester(item.course.level)) return false;
+      if (!prereqSatisfied(item.course.prereq, priorCodes)) return false;
+      return item.div === rejectedDiv;
+    });
+  }
+
+  // Last resort: this slot has cycled through every fresh option matching its division.
+  // Rather than let the Swap button quietly do nothing, allow it to reuse a course
+  // already tried earlier in this same slot (still never a course used elsewhere in
+  // the plan, still level/term/prereq-valid) so a swap always visibly happens.
+  if (!alternativeCourse) {
+    alternativeCourse = pool.find(item => {
+      if (matchesInPlay.has(item.code) || item.code === oldCode) return false;
+      if (!termOk(item.course.term, activePlanData.terms[semIdx])) return false;
+      if (!levelAllowedForSemester(item.course.level)) return false;
+      if (!prereqSatisfied(item.course.prereq, priorCodes)) return false;
+      return item.div === rejectedDiv;
+    });
+  }
+
+  if (alternativeCourse) {
+    currentSemesterList[targetIdx] = alternativeCourse;
+    recomputeReqStatus(activePlanData);
+    withScrollPreserved(()=>renderResults(false));
+  }
+}
+
+/* ============ "OTHER" — SEARCH-AND-PICK SWAP ============
+   Lets a student bypass the algorithm's own alternative-picking and search the full
+   catalog directly: optionally narrow by department prefix, describe what they want
+   in free text, and choose from the closest 3 matches themselves. */
+let customSwapOpen=null;      // {semIdx, code} identifying which slot's panel is open
+let customSwapResults=null;   // top-3 candidates for the open panel, or null before a search
+let customSwapQuery={prefix:"",text:""};
+let customSwapEmptyMsg=null;
+
+function toggleCustomSwap(semIdx, code){
+  if(customSwapOpen && customSwapOpen.semIdx===semIdx && customSwapOpen.code===code){
+    customSwapOpen=null;
+  } else {
+    customSwapOpen={semIdx,code};
+  }
+  customSwapResults=null;
+  customSwapQuery={prefix:"",text:""};
+  customSwapEmptyMsg=null;
+  withScrollPreserved(()=>renderResults(false));
+}
+
+function runCustomSwapSearch(semIdx, oldCode){
+  const activePlanData = PLAN_VARIANTS[activeTab].plan;
+  const currentSemesterList = activePlanData.semesterPlans[semIdx];
+  if(currentSemesterList.findIndex(it => it.code === oldCode) === -1) return;
+
+  const prefixSel=document.getElementById("custom-prefix-"+semIdx+"-"+oldCode);
+  const textInput=document.getElementById("custom-text-"+semIdx+"-"+oldCode);
+  const prefixKey = prefixSel ? prefixSel.value : "";
+  const queryText = textInput ? textInput.value.trim() : "";
+  customSwapQuery={prefix:prefixKey,text:queryText};
+
+  // Refuse (same as the random Swap button) if a later semester relies on this
+  // course as a prerequisite — searching for a replacement wouldn't be safe to apply.
+  const isPrereqForLaterCourse = activePlanData.semesterPlans.some((sem, i) =>
+    i > semIdx && sem.some(it => it.course.prereq === oldCode));
+  if (isPrereqForLaterCourse){
+    customSwapResults=[];
+    customSwapEmptyMsg="This course is a prerequisite for something later in your plan, so it can't be swapped out.";
+    withScrollPreserved(()=>renderResults(false));
+    return;
+  }
+
+  const matchesInPlay = new Set();
+  activePlanData.semesterPlans.forEach(sem => sem.forEach(it => matchesInPlay.add(it.code)));
+  const priorCodes = new Set();
+  activePlanData.semesterPlans.forEach((sem, i) => { if (i < semIdx) sem.forEach(it => priorCodes.add(it.code)); });
+  function levelAllowedForSemester(lvl){
+    if (semIdx <= 1 && lvl >= 300) return false;
+    if (semIdx <= 3 && lvl >= 400) return false;
+    return true;
+  }
+
+  const words = queryText.toLowerCase().split(/\s+/).filter(w=>w.length>1);
+  const deptKeys = prefixKey ? [prefixKey] : DEPT_ORDER.concat(Object.keys(LANGUAGES));
+
+  let candidates=[];
+  deptKeys.forEach(dk=>{
+    const d=deptOf(dk);
+    if(!d) return;
+    Object.keys(d.courses).forEach(code=>{
+      if(code===oldCode || matchesInPlay.has(code)) return;
+      const c=d.courses[code];
+      if(!termOk(c.term, activePlanData.terms[semIdx])) return;
+      if(!levelAllowedForSemester(c.level)) return;
+      if(!prereqSatisfied(c.prereq, priorCodes)) return;
+
+      // Weight matches by specificity, so a course whose own name/tags actually match
+      // ("Foundations in Ethics") outranks one that only matches because its whole
+      // department happens to list a related keyword — otherwise the "closest 3"
+      // results skew toward whatever's alphabetically/numerically first in a broadly
+      // relevant department instead of the course that's actually about the topic.
+      let score=0;
+      const nameL=c.name.toLowerCase(), tagsL=(c.tags||[]).map(t=>t.toLowerCase()), deptLabelL=d.label.toLowerCase(), kwL=(d.keywords||[]).map(k=>k.toLowerCase());
+      words.forEach(w=>{
+        if(nameL.includes(w)) score+=4;
+        if(tagsL.some(t=>t.includes(w))) score+=3;
+        if(deptLabelL.includes(w)) score+=2;
+        if(kwL.some(k=>k.includes(w))) score+=1;
+      });
+      candidates.push({code, dept:dk, deptLabel:d.label, div:d.div, course:c, score});
+    });
+  });
+
+  // Prefer courses that actually matched a typed keyword; if nothing matched at all
+  // (or no keywords were typed), fall back to the full eligible set for that
+  // department so "Other" still returns something useful rather than an empty list.
+  let ranked = words.length ? candidates.filter(c=>c.score>0) : candidates;
+  if(words.length && ranked.length===0) ranked = candidates;
+  ranked.sort((a,b)=> b.score-a.score || a.course.level-b.course.level);
+
+  customSwapResults = ranked.slice(0,3);
+  customSwapEmptyMsg = customSwapResults.length===0
+    ? "No eligible courses fit this slot's term/level/prerequisites in that department — try a different department or clearing it to search everywhere."
+    : null;
+  withScrollPreserved(()=>renderResults(false));
+}
+
+function applyCustomSwap(semIdx, oldCode, newCode){
+  const activePlanData = PLAN_VARIANTS[activeTab].plan;
+  const currentSemesterList = activePlanData.semesterPlans[semIdx];
+  const targetIdx = currentSemesterList.findIndex(it => it.code === oldCode);
+  if(targetIdx === -1 || !customSwapResults) return;
+  const chosen = customSwapResults.find(c=>c.code===newCode);
+  if(!chosen) return;
+
+  if(!window.bannedBySlot) window.bannedBySlot = {};
+  const slotKey = activeTab+"_"+semIdx+"_"+targetIdx;
+  if(!window.bannedBySlot[slotKey]) window.bannedBySlot[slotKey] = new Set();
+  window.bannedBySlot[slotKey].add(oldCode);
+
+  currentSemesterList[targetIdx] = chosen;
+  recomputeReqStatus(activePlanData);
+  customSwapOpen=null; customSwapResults=null; customSwapQuery={prefix:"",text:""}; customSwapEmptyMsg=null;
+  withScrollPreserved(()=>renderResults(false));
+}
+
+function renderCustomSwapPanel(semIdx, code){
+  if(!customSwapOpen || customSwapOpen.semIdx!==semIdx || customSwapOpen.code!==code) return "";
+  const deptOptions = `<option value="">Any department</option>`
+    + DEPT_ORDER.map(k=>`<option value="${k}" ${customSwapQuery.prefix===k?'selected':''}>${DEPTS[k].label}</option>`).join("")
+    + Object.keys(LANGUAGES).map(k=>`<option value="${k}" ${customSwapQuery.prefix===k?'selected':''}>${LANGUAGES[k].label} (language)</option>`).join("");
+
+  let resultsHtml;
+  if(customSwapResults===null){
+    resultsHtml=`<div class="custom-swap-hint">Pick a department (optional), describe what you're looking for, then press Enter.</div>`;
+  } else if(customSwapResults.length===0){
+    resultsHtml=`<div class="custom-swap-empty">${customSwapEmptyMsg||"No matches found."}</div>`;
+  } else {
+    resultsHtml=`<div class="custom-swap-results">`+customSwapResults.map(r=>{
+      const divNum=r.div==='I'?1:r.div==='II'?2:3;
+      return `<div class="custom-swap-result" onclick="applyCustomSwap(${semIdx}, '${code}', '${r.code}')">
+        <div class="csr-code">${r.code.replace(/([A-Z]+)(\d+)/,"$1 $2")}<span class="tag div${divNum}">D${divNum}</span></div>
+        <div class="csr-name">${r.course.name}</div>
+        <div class="csr-why">${r.deptLabel} · ${TERM_LABEL[r.course.term]||r.course.term}</div>
+      </div>`;
+    }).join("")+`</div>`;
+  }
+
+  return `<div class="custom-swap-panel">
+    <div class="custom-swap-row">
+      <select id="custom-prefix-${semIdx}-${code}" onchange="runCustomSwapSearch(${semIdx}, '${code}')">${deptOptions}</select>
+      <input type="text" id="custom-text-${semIdx}-${code}" value="${(customSwapQuery.text||'').replace(/"/g,'&quot;')}" placeholder="e.g. environmental policy, ethics, game theory..." onkeydown="if(event.key==='Enter'){ event.preventDefault(); runCustomSwapSearch(${semIdx}, '${code}'); }">
+    </div>
+    ${resultsHtml}
+  </div>`;
+}
+
+let PLAN_VARIANTS=[];
+let activeTab=0;
+let EFFECTIVE_MAJOR=null;
+let FIT_RANKING=null;
+
+function generateAllPlans(){
+  const majorKey = answers.hasMajor==="yes" ? answers.chosenMajor : null;
+  FIT_RANKING = majorKey ? null : scoreMajorFit();
+  EFFECTIVE_MAJOR = majorKey || FIT_RANKING[0].key;
+
+  const configs=[
+    {name:"Option A",tag:"Focus & Finish",desc:"Locks in two major courses nearly every term to clear requirements fast. Perfect for STEM sequences and early pre-med timelines.",majorWeight:6,exciteWeight:2,majorCap:8,seed:0},
+    {name:"Option B",tag:"Follow Passions",desc:"No major picked yet? First year stays a wide-open sampler across departments. Major already chosen? Still caps at two major courses a term, but always saves a slot for a passion elective outside your major.",majorWeight:5,exciteWeight:7,majorCap:10,passionElective:true,exploreFirstYear:true,seed:5},
+    {name:"Option C",tag:"Rigorous Depth",desc:"Two major courses a term through first year, then ramps to three a term starting sophomore spring for a steeper depth trajectory.",majorWeight:7,exciteWeight:4,majorCap:9,breadthMode:true,semMajorCap:semIdx=>semIdx>=3?3:2,seed:11},
+  ];
+  PLAN_VARIANTS=configs.map(cfg=>({cfg,plan:buildOnePlan(EFFECTIVE_MAJOR,cfg)}));
+  activeTab=0;
+  renderResults(true);
+  // Persists answers (not the derived plan itself -- generation is deterministic, so replaying
+  // the same answers always reproduces the same suggestions) so a signed-in user's plan survives
+  // logging out and back in. Defined by the module script once the user is authenticated.
+  if(typeof onPlanGenerated==="function") onPlanGenerated();
+}
+
+const TERM_LABEL={F:"Fall",S:"Spring"};
+
+const STUDY_ABROAD_PROGRAMS={
+  oxford:{label:"Williams-Exeter Programme at Oxford",note:"Oxford's tutorial system has its own application timeline and expects strong preparation in your tutorial subject beforehand"},
+  mystic:{label:"Williams-Mystic (Maritime Studies Program)",note:"Williams-Mystic runs its own integrated curriculum, so confirm with your major advisor which of its offerings map back to your specific major requirements"},
+  other:{label:"an approved program abroad",note:"approved programs vary widely in what they offer, so confirm early with both the Study Away office and your major advisor that your specific program's courses will count"},
+  undecided:{label:"a study abroad program",note:"once you've picked a program, confirm with the Study Away office and your major advisor what it requires and what it counts for"}
+};
+function studyAbroadProgramLabel(){
+  const p=answers.studyAbroadProgram;
+  if(!p) return "Studying Away";
+  if(p==="other" && answers.studyAbroadProgramOther) return answers.studyAbroadProgramOther;
+  return (STUDY_ABROAD_PROGRAMS[p]||{}).label || "Studying Away";
+}
+
+// Hover-card markup for a course: its full description plus term/level/prereq context.
+// Shared by the schedule's course chips and the "Requirements at a Glance" pills so
+// hovering either one tells you what the course actually covers, not just its code.
+function courseTooltipHtml(code,course,deptLabel){
+  const termText = course.term==="FS" ? "Fall & Spring" : (TERM_LABEL[course.term]||course.term);
+  let prereqText = "None";
+  if(course.prereq){
+    const found=findCourseGlobal(course.prereq);
+    prereqText = found ? `${course.prereq.replace(/([A-Z]+)(\d+)/,"$1 $2")} (${found.course.name})` : course.prereq;
+  }
+  const attrsText = (course.attrs&&course.attrs.length) ? course.attrs.join(", ") : "None";
+  return `<div class="course-tooltip">
+    <div class="ct-head">${code.replace(/([A-Z]+)(\d+)/,"$1 $2")} — ${course.name}</div>
+    <div class="ct-desc">${course.desc||"No description available."}</div>
+    <div class="ct-meta">${deptLabel} · Level ${course.level} · ${termText}<br>Prereq: ${prereqText} · Attrs: ${attrsText}</div>
+  </div>`;
+}
+
+function reasonFor(item,majorKey){
+  const {course,dept}=item;
+  const bits=[];
+  const effDept = item.registeredAs ? item.registeredAs.deptKey : dept;
+  const effDiv = item.registeredAs ? item.registeredAs.div : deptOf(dept).div;
+  if(effDept===majorKey) bits.push("major sequence core");
+  if(LANGUAGES[dept]) bits.push("world language sequence");
+  if(item.passionPick && !item.loveMatch) bits.push("passion elective outside your major");
+  if(item.loveMatch){
+    const blob=freeTextBlob();
+    const matched=(course.tags||[]).find(t=>answers.tagPrefs[dept+"::"+t]==="love")
+      || (course.tags||[]).find(t=>t.length>2 && blob.includes(t.toLowerCase()));
+    bits.push(matched?`matches your interest in "${matched}"`:"matches your stated interests");
+  }
+  if(course.attrs.includes("WS")) bits.push("Writing Skills [WS]");
+  if(course.attrs.includes("DPE")) bits.push("Diversity & Equity [DPE]");
+  if(course.attrs.includes("QFR")) bits.push("Quantitative Competency [QFR]");
+  if(item.registeredAs){
+    bits.push(`cross-listed as ${item.registeredAs.code.replace(/([A-Z]+)(\d+)/,"$1 $2")} — registering under that listing counts this toward ${item.registeredAs.deptLabel} / Div ${effDiv}`);
+  } else {
+    bits.push(`Div ${effDiv}`);
+  }
+  return bits.join(" · ");
+}
+
+function selectTab(i){
+  activeTab=i;
+  customSwapOpen=null; customSwapResults=null; customSwapQuery={prefix:"",text:""}; customSwapEmptyMsg=null;
+  withScrollPreserved(()=>renderResults(false));
+}
+
+function renderResults(shouldScroll = true){
+  document.getElementById("quiz").style.display="none";
+  const results=document.getElementById("results");
+  results.style.display="block";
+
+  const majorKey=EFFECTIVE_MAJOR;
+  document.getElementById("plan-h2").textContent = FIT_RANKING?`Curriculum Frameworks (Tracking toward ${DEPTS[majorKey].label})`:`Curriculum Architecture — ${DEPTS[majorKey].label} Major`;
+  document.getElementById("plan-sub").textContent = `6 Term Progression Blueprint · 4 Classes/Term · Starting ${TERM_LABEL[answers.start]} 2026`;
+
+  const fitBlock=document.getElementById("fit-block");
+  if(FIT_RANKING){
+    fitBlock.style.display="block";
+    fitBlock.innerHTML=`<div class="q-title" style="font-size:16px;margin-bottom:10px;">Algorithmic Area Fits</div>`+
+      FIT_RANKING.slice(0,4).map(f=>`<div class="fit-card"><div class="fname">${f.label}</div><div class="frat">${f.summary}</div></div>`).join("");
+  } else { fitBlock.style.display="none"; }
+
+  const majorReqBlock=document.getElementById("major-req-block");
+  const majorDept=DEPTS[majorKey];
+  const majorGoalForBlock=PLAN_VARIANTS[activeTab].plan.reqStatus.majorGoal;
+  majorReqBlock.innerHTML=`
+    <h3>${majorDept.label} Major — Requirements at a Glance</h3>
+    <div class="mrb-sub">${majorDept.majorSummary} This plan targets ${majorGoalForBlock} ${majorDept.label} course(s) toward that total. Required core sequence:</div>
+    <div class="mrb-codes">${majorDept.backbone.map(code=>{
+      const bc=majorDept.courses[code];
+      const tip=bc?courseTooltipHtml(code,bc,majorDept.label):"";
+      return `<span class="mrb-code tooltip-trigger" tabindex="0">${code.replace(/([A-Z]+)(\d+)/,"$1 $2")}${tip}</span>`;
+    }).join("")}</div>`;
+
+  const tabbar=document.getElementById("tabbar");
+  tabbar.innerHTML=PLAN_VARIANTS.map((v,i)=>`<div class="tabbtn ${i===activeTab?'active':''}" onclick="selectTab(${i})">
+      <span class="tname">${v.cfg.name}: ${v.cfg.tag}</span>
+      <span class="tdesc">${v.cfg.desc}</span>
+    </div>`).join("");
+
+  const {semesterPlans,terms,reqStatus,abroadIdx}=PLAN_VARIANTS[activeTab].plan;
+
+  const reqbar=document.getElementById("reqbar");
+  const chips=[
+    {label:"Div I",val:`${reqStatus.divCount.D1}/3`,ok:reqStatus.divCount.D1>=3},
+    {label:"Div II",val:`${reqStatus.divCount.D2}/3`,ok:reqStatus.divCount.D2>=3},
+    {label:"Div III",val:`${reqStatus.divCount.D3}/3`,ok:reqStatus.divCount.D3>=3},
+    {label:"Writing (WS)",val:`${reqStatus.wsCount}/2`,ok:reqStatus.wsCount>=2},
+    {label:"DPE",val:`${reqStatus.dpeCount}/1`,ok:reqStatus.dpeCount>=1},
+    {label:"QFR",val:`${reqStatus.qfrCount}/1`,ok:reqStatus.qfrCount>=1},
+  ];
+  reqbar.innerHTML=chips.map(c=>`<div class="req-chip ${c.ok?'ok':'warn'}"><div class="label">${c.label}</div><div class="val">${c.val}</div></div>`).join("")
+    + `<div class="req-chip ${reqStatus.majorFinished?'ok':'info'}"><div class="label">Major Progress</div><div class="val">${Math.min(reqStatus.majorCount,reqStatus.majorGoal)}/${reqStatus.majorGoal}</div></div>`
+    + (reqStatus.wantsLang ? `<div class="req-chip ${reqStatus.langCount>=reqStatus.langGoal?'ok':'info'}"><div class="label">Language</div><div class="val">${reqStatus.langCount}/${reqStatus.langGoal}</div></div>` : "");
+
+  let year=2026;
+  const timeline=document.getElementById("timeline");
+  timeline.innerHTML=semesterPlans.map((items,i)=>{
+    if(i>0 && terms[i]==="F") year++;
+    const label=`${TERM_LABEL[terms[i]]} ${year}`;
+    if(abroadIdx.has(i)){
+      return `<div class="sem-card abroad"><div class="sem-label">Semester ${i+1}</div><div class="sem-title">${label}</div>
+        <div class="course-chip abroad">Studying Away (${studyAbroadProgramLabel()})<br><br><span style="font-weight:400;font-size:11.5px;">Approved coursework converts back to Williams credit. Confirm which of your specific courses count before you go.</span></div></div>`;
+    }
+    let body=items.map(item=>{
+      const c=item.course;
+      const effDiv = item.registeredAs ? item.registeredAs.div : item.div;
+      const divNum=effDiv==='I'?1:effDiv==='II'?2:3;
+      const tagHtml=[`<span class="tag div${divNum}">D${divNum}</span>`].concat(c.attrs.map(a=>`<span class="tag ${a.toLowerCase()}">${a}</span>`)).join("");
+      const codeLabel=item.code.replace(/([A-Z]+)(\d+)/,"$1 $2")
+        + (item.registeredAs ? ` <span style="opacity:.6;font-weight:500;">/ ${item.registeredAs.code.replace(/([A-Z]+)(\d+)/,"$1 $2")}</span>` : "");
+      const deptLabel = item.registeredAs ? `${item.deptLabel} (cross-listed, ${item.registeredAs.deptLabel})` : item.deptLabel;
+      const isOtherOpen = customSwapOpen && customSwapOpen.semIdx===i && customSwapOpen.code===item.code;
+      const isEnrolled=enrolledSet.has(item.code);
+      return `<div class="course-chip">
+        <div class="code">${codeLabel} <span class="tags">${tagHtml}</span></div>
+        <div class="name tooltip-trigger" tabindex="0">${c.name}${courseTooltipHtml(item.code,c,item.deptLabel)}</div>
+        <div class="why">${deptLabel} · ${reasonFor(item,majorKey)}</div>
+        ${renderCustomSwapPanel(i, item.code)}
+        <div class="chip-actions">
+          <button class="swap-action-btn" onclick="swapCourse(${i}, '${item.code}')">Swap</button>
+          <button class="other-action-btn ${isOtherOpen?'active':''}" onclick="toggleCustomSwap(${i}, '${item.code}')">Other</button>
+          <button class="enroll-action-btn ${isEnrolled?'active':''}" onclick="toggleEnroll('${item.code}')">${isEnrolled?'&check; Enrolled':'Mark Enrolled'}</button>
+        </div>
+      </div>`;
+    }).join("");
+    for(let e=items.length;e<4;e++){
+      body+=`<div class="course-chip flex">Open Elective Slot (Explore Catalog Fields / WSP Labs)</div>`;
+    }
+    return `<div class="sem-card"><div class="sem-label">Semester ${i+1}</div><div class="sem-title">${label}</div>${body}</div>`;
+  }).join("");
+
+  const notes=document.getElementById("plan-notes");
+  const noteItems=[
+    "Prefix Logic: Ensure no more than two scheduled options inside a single general education basket contain identical code prefixes.",
+    "PE Progress Tracking: Keep track of your co-curricular physical activity blocks independently of this academic database.",
+    "Integrated Multi-Department Matching: Swapping a course automatically forces the logic solver to crawl alternative vectors matching required attributes cleanly.",
+    "Difficulty Calibration: The course generator ensures foundational 100/200 level options lock early before opening upper-tier seminars."
+  ];
+
+  const isAbroad=answers.studyAbroad && answers.studyAbroad!=="no";
+  const abroadProgram=STUDY_ABROAD_PROGRAMS[answers.studyAbroadProgram]||null;
+  const abroadProgramLabel=isAbroad?studyAbroadProgramLabel():"";
+  if(!reqStatus.majorFinished){
+    const remaining=reqStatus.majorGoal-reqStatus.majorCount;
+    let msg=`<span class="note-highlight">Senior Year Heads-Up:</span> this plan wraps up ${reqStatus.majorCount} of ${reqStatus.majorGoal} ${DEPTS[majorKey].label} requirements by the end of junior year, so ${remaining} course(s) will roll into senior year. That's completely normal for this major — just make sure to leave room for them in your senior schedule.`;
+    if(isAbroad) msg+=` Since you're planning on ${abroadProgramLabel}, most departments require your major requirements to be substantially complete before they'll sign off on your application — check with your major advisor well before your program's application deadline about which of these can be taken beforehand, taken while away, substituted, or pushed to senior year.`;
+    noteItems.push(msg);
+  } else if(isAbroad){
+    let msg=`<span class="note-highlight">Study Abroad Note:</span> your ${DEPTS[majorKey].label} major requirements are on pace to be finished by the end of junior year, which is exactly the kind of head start departments look for before approving you for ${abroadProgramLabel}. Confirm with your major advisor that these requirements are locked in before you apply, and that your specific abroad courses are pre-approved for credit.`;
+    if(abroadProgram) msg+=` One thing specific to this route: ${abroadProgram.note}.`;
+    noteItems.push(msg);
+  }
+
+  notes.innerHTML=`<h3>Strategic Planning Guidelines</h3><ul>${noteItems.map(n=>`<li>${n}</li>`).join("")}</ul>`;
+
+  if (shouldScroll) {
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+}
+
+/* No unconditional renderQuiz() call here -- the module script below decides whether to show a
+   fresh quiz or resume a previously saved plan once it knows the signed-in user's saved state. */
+
+</script>
+<script type="module">
+  import { auth, db, requireLogin, mountNav } from "./shared/auth.js";
+  import {
+    doc, getDoc, setDoc, deleteDoc, collection, getDocs, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  requireLogin(async (user) => {
+    mountNav("planner", user);
+    await loadEnrollments(user.uid);
+    const savedAnswers = await loadPlanState(user.uid);
+    if (savedAnswers) {
+      // Plan generation is a pure function of `answers` (no randomness anywhere in
+      // buildOnePlan/scoreMajorFit), so replaying the saved answers reproduces the exact same
+      // suggestions the user last saw, without needing to store the derived plan itself.
+      Object.assign(answers, savedAnswers);
+      generateAllPlans();
+    } else {
+      renderQuiz();
+    }
+  });
+
+  async function loadEnrollments(uid) {
+    const snap = await getDocs(collection(db, "users", uid, "enrollments"));
+    snap.forEach((d) => enrolledSet.add(d.id));
+  }
+
+  async function loadPlanState(uid) {
+    try {
+      const snap = await getDoc(doc(db, "users", uid, "planState", "current"));
+      if (snap.exists() && snap.data().answers) return snap.data().answers;
+    } catch (e) {
+      console.error("Could not load saved plan state:", e);
+    }
+    return null;
+  }
+
+  function setSaveStatus(text, isError) {
+    const el = document.getElementById("save-status");
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle("error", !!isError);
+  }
+
+  async function savePlanState() {
+    const user = auth.currentUser;
+    if (!user) return;
+    setSaveStatus("Saving your plan…", false);
+    try {
+      await setDoc(doc(db, "users", user.uid, "planState", "current"), {
+        answers,
+        updatedAt: serverTimestamp()
+      });
+      setSaveStatus("Saved just now — safe to close this page", false);
+    } catch (e) {
+      console.error("Could not save plan state:", e);
+      setSaveStatus("Couldn't save — tap here to retry", true);
+      throw e;
+    }
+  }
+
+  // pendingSave lets nav-away/logout wait for an in-flight save instead of racing it (see
+  // shared/auth.js mountNav, which calls window.__beforeNavigateAway before navigating).
+  let pendingSave = null;
+
+  // Called from the classic script's generateAllPlans() every time plans are (re)built, so the
+  // signed-in user's latest answers are always what gets restored on their next visit.
+  window.onPlanGenerated = function () {
+    pendingSave = savePlanState().catch(() => {});
+  };
+
+  // Manual fallback / retry, wired to clicking the save-status text itself.
+  window.__manualSavePlan = function () {
+    pendingSave = savePlanState().catch(() => {});
+  };
+
+  // Called by mountNav before following a nav link or logging out, so a save that's still in
+  // flight gets a chance to finish instead of being abandoned mid-request by the navigation.
+  window.__beforeNavigateAway = async function () {
+    if (pendingSave) await pendingSave;
+  };
+
+  window.toggleEnroll = async function (code) {
+    const user = auth.currentUser;
+    if (!user) return;
+    const found = typeof findCourseGlobal === "function" ? findCourseGlobal(code) : null;
+    if (!found) return;
+    const ref = doc(db, "users", user.uid, "enrollments", code);
+    // Flat, top-level collection mirroring just enough of each enrollment for admin.html to
+    // tally -- a plain collection query here, deliberately NOT a collectionGroup query over
+    // users/*/enrollments, since Firestore denied that collection-group list even with rules
+    // that allow the equivalent single-document read (a real rough edge, not a rules bug).
+    const logRef = doc(db, "adminEnrollmentLog", user.uid + "_" + code);
+    try {
+      if (enrolledSet.has(code)) {
+        await deleteDoc(ref);
+        await deleteDoc(logRef).catch(() => {});
+        enrolledSet.delete(code);
+      } else {
+        const majorAtEnrollment = (typeof EFFECTIVE_MAJOR !== "undefined" && EFFECTIVE_MAJOR) ? EFFECTIVE_MAJOR : (answers.chosenMajor || null);
+        await setDoc(ref, {
+          code,
+          deptKey: found.deptKey,
+          deptLabel: found.deptObj.label,
+          term: found.course.term,
+          level: found.course.level,
+          majorAtEnrollment,
+          enrolledAt: serverTimestamp(),
+          notes: "",
+          notesUpdatedAt: serverTimestamp()
+        });
+        await setDoc(logRef, {
+          uid: user.uid,
+          code,
+          deptKey: found.deptKey,
+          deptLabel: found.deptObj.label,
+          majorAtEnrollment,
+          enrolledAt: serverTimestamp()
+        }).catch((e) => console.error("Could not update admin log (non-fatal):", e));
+        enrolledSet.add(code);
+      }
+    } catch (e) {
+      console.error("Could not update enrollment:", e);
+      alert("Couldn't save that right now — check your connection and try again.");
+      return;
+    }
+    withScrollPreserved(() => renderResults(false));
+  };
+</script>
+</body>
+</html>

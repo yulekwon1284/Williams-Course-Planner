@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log In &mdash; Williams College Course &amp; Major Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css?v=3">
+<style>
+  body{background:var(--cream);}
+</style>
+</head>
+<body class="auth-pending">
+<div class="director-credit"><span class="credit-badge"><span class="credit-dot"></span>Directed by <strong>Yule Kwon</strong></span></div>
+<div class="auth-loading">Checking your session&hellip;</div>
+<div class="page-content">
+  <div class="auth-card">
+    <h1>Williams Course Planner</h1>
+    <div class="auth-sub">Log in to keep your enrolled courses and notes saved across visits.</div>
+
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="tab-login" onclick="setMode('login')">Log In</div>
+      <div class="auth-tab" id="tab-signup" onclick="setMode('signup')">Sign Up</div>
+    </div>
+
+    <form id="auth-form" onsubmit="return false;">
+      <input type="text" id="f-username" placeholder="Username" autocomplete="username" maxlength="20">
+      <input type="password" id="f-password" placeholder="Password" autocomplete="current-password">
+      <button type="submit" class="primary" id="f-submit" onclick="submitForm()">Log In</button>
+    </form>
+    <div class="auth-error" id="f-error" style="display:none;"></div>
+    <div class="auth-hint" id="f-hint">Usernames: 3&ndash;20 characters, lowercase letters/numbers/underscores only. Passwords need at least 6 characters. There's no password-reset email (this isn't tied to a real inbox) &mdash; if you forget your password, you'll need a new account for now.</div>
+  </div>
+  <footer class="site-footer">
+    <div class="footer-credit">&copy; 2026 Yule Kwon. All rights reserved.</div>
+    <div class="footer-contact">
+      <a href="tel:+12232057294" aria-label="Call 223-205-7294" title="223-205-7294">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+      </a>
+      <a href="mailto:beberlin1284@gmail.com" aria-label="Email beberlin1284@gmail.com" title="beberlin1284@gmail.com">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+      </a>
+      <a href="https://instagram.com/yuleseoul" target="_blank" rel="noopener" aria-label="Instagram @yuleseoul" title="@yuleseoul">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+      </a>
+    </div>
+  </footer>
+</div>
+<script type="module">
+  import { signUp, logIn, redirectIfLoggedIn } from "./shared/auth.js";
+
+  redirectIfLoggedIn("planner.html");
+  // Not gated by requireLogin() like the other pages -- this page IS the logged-out landing
+  // page, so reveal it immediately rather than waiting on an auth check.
+  document.body.classList.remove("auth-pending");
+
+  let mode = "login";
+  window.setMode = function(next){
+    mode = next;
+    document.getElementById("tab-login").classList.toggle("active", mode==="login");
+    document.getElementById("tab-signup").classList.toggle("active", mode==="signup");
+    document.getElementById("f-submit").textContent = mode==="login" ? "Log In" : "Sign Up";
+    document.getElementById("f-password").autocomplete = mode==="login" ? "current-password" : "new-password";
+    document.getElementById("f-error").style.display = "none";
+  };
+
+  window.submitForm = async function(){
+    const username = document.getElementById("f-username").value;
+    const password = document.getElementById("f-password").value;
+    const errEl = document.getElementById("f-error");
+    const btn = document.getElementById("f-submit");
+    errEl.style.display = "none";
+    btn.disabled = true;
+    try{
+      if(mode === "login"){
+        await logIn(username, password);
+      } else {
+        await signUp(username, password);
+      }
+      window.location.href = "planner.html";
+    } catch(e){
+      errEl.textContent = e.message || "Something went wrong.";
+      errEl.style.display = "block";
+      btn.disabled = false;
+    }
+  };
+</script>
+</body>
+</html>

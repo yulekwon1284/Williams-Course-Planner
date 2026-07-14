@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Notes &mdash; Williams College Course &amp; Major Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/styles.css?v=3">
+</head>
+<body class="auth-pending">
+<div class="director-credit"><span class="credit-badge"><span class="credit-dot"></span>Directed by <strong>Yule Kwon</strong></span></div>
+<div class="auth-loading">Checking your session&hellip;</div>
+<div class="page-content">
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-top">
+      <div class="eyebrow">Williams College &middot; My Notes</div>
+    </div>
+    <h1>Your enrolled courses</h1>
+    <p>Everything you've marked <strong>Enrolled</strong> from the <a href="planner.html">planner</a> shows up here. Notes save automatically a moment after you stop typing.</p>
+  </header>
+
+  <div id="course-list"></div>
+  <footer class="site-footer">
+    <div class="footer-credit">&copy; 2026 Yule Kwon. All rights reserved.</div>
+    <div class="footer-contact">
+      <a href="tel:+12232057294" aria-label="Call 223-205-7294" title="223-205-7294">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+      </a>
+      <a href="mailto:beberlin1284@gmail.com" aria-label="Email beberlin1284@gmail.com" title="beberlin1284@gmail.com">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+      </a>
+      <a href="https://instagram.com/yuleseoul" target="_blank" rel="noopener" aria-label="Instagram @yuleseoul" title="@yuleseoul">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+      </a>
+    </div>
+  </footer>
+</div>
+</div>
+
+<script src="shared/course-data.js"></script>
+<script type="module">
+  import { auth, db, requireLogin, mountNav } from "./shared/auth.js";
+  import {
+    collection, query, orderBy, getDocs, doc, deleteDoc, updateDoc, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let uid = null;
+  const saveTimers = {};
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  requireLogin(async (user) => {
+    uid = user.uid;
+    mountNav("notes", user);
+    await renderList();
+  });
+
+  async function renderList() {
+    const listEl = document.getElementById("course-list");
+    const q = query(collection(db, "users", uid, "enrollments"), orderBy("enrolledAt", "desc"));
+    const snap = await getDocs(q);
+
+    if (snap.empty) {
+      listEl.innerHTML = `<div class="empty-state">No enrolled courses yet. Head to the <a href="planner.html">planner</a>, build a plan, and click <strong>Mark Enrolled</strong> on any course you're actually taking.</div>`;
+      return;
+    }
+
+    let html = "";
+    snap.forEach((d) => {
+      const data = d.data();
+      const code = d.id;
+      const found = typeof findCourseGlobal === "function" ? findCourseGlobal(code) : null;
+      const name = found ? found.course.name : data.deptLabel + " " + code;
+      const desc = found ? found.course.desc : "";
+      const codeLabel = code.replace(/([A-Z]+)(\d+)/, "$1 $2");
+      const majorLabel = data.majorAtEnrollment ? (window.DEPTS && DEPTS[data.majorAtEnrollment] ? DEPTS[data.majorAtEnrollment].label : data.majorAtEnrollment) : "an";
+      html += `
+        <div class="notes-course-card" data-code="${code}">
+          <div class="nc-code">${escapeHtml(codeLabel)}</div>
+          <div class="nc-name">${escapeHtml(name)}</div>
+          <div class="nc-meta">${escapeHtml(data.deptLabel || "")} &middot; ${escapeHtml(data.term || "")} term &middot; enrolled as part of a ${escapeHtml(majorLabel)} plan${desc ? " &middot; " + escapeHtml(desc) : ""}</div>
+          <textarea placeholder="Notes for this course&hellip;" data-code="${code}">${escapeHtml(data.notes || "")}</textarea>
+          <div class="nc-status" id="status-${cssSafe(code)}">&nbsp;</div>
+          <button class="nc-unenroll" data-code="${code}" type="button">Remove from My Notes</button>
+        </div>`;
+    });
+    listEl.innerHTML = html;
+
+    listEl.querySelectorAll("textarea").forEach((el) => {
+      el.addEventListener("input", () => scheduleSave(el.dataset.code, el.value));
+    });
+    listEl.querySelectorAll(".nc-unenroll").forEach((btn) => {
+      btn.addEventListener("click", () => unenroll(btn.dataset.code));
+    });
+  }
+
+  function cssSafe(code) {
+    return code.replace(/[^a-zA-Z0-9]/g, "");
+  }
+
+  function scheduleSave(code, text) {
+    const statusEl = document.getElementById("status-" + cssSafe(code));
+    if (statusEl) statusEl.textContent = "Typing…";
+    clearTimeout(saveTimers[code]);
+    saveTimers[code] = setTimeout(() => saveNote(code, text), 800);
+  }
+
+  async function saveNote(code, text) {
+    const statusEl = document.getElementById("status-" + cssSafe(code));
+    if (statusEl) statusEl.textContent = "Saving…";
+    try {
+      await updateDoc(doc(db, "users", uid, "enrollments", code), {
+        notes: text,
+        notesUpdatedAt: serverTimestamp()
+      });
+      if (statusEl) statusEl.textContent = "Saved";
+    } catch (e) {
+      console.error("Could not save note:", e);
+      if (statusEl) statusEl.textContent = "Couldn't save — check your connection.";
+    }
+  }
+
+  async function unenroll(code) {
+    if (!confirm("Remove this course and its notes from My Notes? This can't be undone.")) return;
+    try {
+      await deleteDoc(doc(db, "users", uid, "enrollments", code));
+      await renderList();
+    } catch (e) {
+      console.error("Could not remove enrollment:", e);
+      alert("Couldn't remove that right now — check your connection and try again.");
+    }
+  }
+</script>
+</body>
+</html>

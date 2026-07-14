@@ -1,0 +1,86 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) { return request.auth != null && request.auth.uid == uid; }
+    // Replace with your own Firebase Auth UID after your first real signup (Console ->
+    // Authentication -> Users). Must match OWNER_UID in shared/firebase-config.js exactly, or
+    // admin.html's queries will be denied even for you. See README.md.
+    function isAdmin() { return request.auth != null && request.auth.uid == "Cb5I2d01OxN6a2NM6Z3Wp57AsS13"; }
+
+    // Username reservation: create-once, never readable or writable by clients otherwise.
+    // Login never reads this collection (the email is derived deterministically from the
+    // username), so `allow read: if false` is safe — it exists purely to make signup uniqueness
+    // atomic and independent of Firebase Auth's own duplicate-account error behavior.
+    match /usernames/{username} {
+      allow read: if false;
+      allow create: if request.auth != null
+                    && request.resource.data.keys().hasOnly(['uid'])
+                    && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    && request.resource.data.keys().hasOnly(['username', 'createdAt'])
+                    && request.resource.data.username is string
+                    && request.resource.data.username.size() >= 3
+                    && request.resource.data.username.size() <= 20;
+      // Username is immutable in v1 -- no update/delete. See README "known limitations."
+      allow update, delete: if false;
+
+      match /enrollments/{code} {
+        // Admin analytics reads from the separate top-level adminEnrollmentLog collection below,
+        // not from here -- Firestore denied a collectionGroup("enrollments") list for the admin
+        // account even though the equivalent single-document read was allowed, a real rough edge
+        // in how list operations get evaluated across collection groups. A flat top-level
+        // collection sidesteps that entirely, so this stays scoped to the owning user only.
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+                      && code.matches('^[A-Z]{2,6}[0-9]{3}$')
+                      && request.resource.data.code == code
+                      && request.resource.data.keys().hasOnly(
+                           ['code', 'deptKey', 'deptLabel', 'term', 'level', 'majorAtEnrollment', 'enrolledAt', 'notes', 'notesUpdatedAt']
+                         )
+                      && request.resource.data.enrolledAt == request.time;
+        // Only the notes fields can ever change after creation -- course code, dept, term, level,
+        // and the original enrollment timestamp are locked in at creation time.
+        allow update: if isOwner(uid)
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['notes', 'notesUpdatedAt'])
+                      && request.resource.data.notes is string
+                      && request.resource.data.notes.size() < 5000;
+        allow delete: if isOwner(uid);
+      }
+
+      // Saved quiz answers, so a resumed session reproduces the same suggestions (plan
+      // generation is deterministic -- see planner.html) without storing the derived plan
+      // itself. Purely personal working state (never read by admin.html), so this only checks
+      // ownership and basic shape, not an exhaustive field allowlist like enrollments above --
+      // new quiz questions shouldn't require a rules change to keep saving correctly.
+      match /planState/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if isOwner(uid)
+                     && docId == 'current'
+                     && request.resource.data.answers is map
+                     && request.resource.data.updatedAt == request.time;
+      }
+    }
+
+    // Flat, top-level mirror of enrollments (deliberately NOT nested under users/{uid}) purely
+    // for admin.html's tally query. A plain "list all documents in this top-level collection"
+    // read is unambiguous for Firestore's rules engine -- no wildcard-uid or collection-group
+    // semantics involved -- which is why this exists instead of relying on isAdmin() to read
+    // across the nested users/*/enrollments collection group above.
+    match /adminEnrollmentLog/{logId} {
+      allow read: if isAdmin();
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.code is string
+                    && request.resource.data.keys().hasOnly(['uid', 'code', 'deptKey', 'deptLabel', 'majorAtEnrollment', 'enrolledAt'])
+                    && request.resource.data.enrolledAt == request.time;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}
