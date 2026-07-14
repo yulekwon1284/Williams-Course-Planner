@@ -43,7 +43,7 @@
 <script type="module">
   import { auth, db, requireLogin, mountNav } from "./shared/auth.js";
   import {
-    collection, query, orderBy, getDocs, doc, deleteDoc, updateDoc, serverTimestamp
+    collection, query, orderBy, getDocs, doc, deleteDoc, updateDoc, serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   let uid = null;
@@ -191,10 +191,13 @@
   async function unenroll(code) {
     if (!confirm("Remove this course and its notes from My Notes? This can't be undone.")) return;
     try {
-      await deleteDoc(doc(db, "users", uid, "enrollments", code));
-      // Mirrors planner.html's toggleEnroll -- un-enrolling from here must also clear the flat
-      // admin log entry, or admin.html keeps counting a course the student removed.
-      await deleteDoc(doc(db, "adminEnrollmentLog", uid + "_" + code)).catch(() => {});
+      // Batched with planner.html's same pattern -- both the enrollment doc and its admin-log
+      // mirror are deleted in one atomic commit, so a partial failure can never leave a removed
+      // course still counted on admin.html.
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "users", uid, "enrollments", code));
+      batch.delete(doc(db, "adminEnrollmentLog", uid + "_" + code));
+      await batch.commit();
       delete journalCache[code];
       await renderList();
     } catch (e) {

@@ -1100,7 +1100,7 @@ function renderResults(shouldScroll = true){
 <script type="module">
   import { auth, db, requireLogin, mountNav } from "./shared/auth.js";
   import {
-    doc, getDoc, setDoc, deleteDoc, collection, getDocs, serverTimestamp
+    doc, getDoc, setDoc, deleteDoc, collection, getDocs, serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   requireLogin(async (user) => {
@@ -1189,14 +1189,20 @@ function renderResults(shouldScroll = true){
     // users/*/enrollments, since Firestore denied that collection-group list even with rules
     // that allow the equivalent single-document read (a real rough edge, not a rules bug).
     const logRef = doc(db, "adminEnrollmentLog", user.uid + "_" + code);
+    // Batched so the enrollment doc and its admin-log mirror always change together -- either
+    // both writes land or neither does, so the two can never drift out of sync the way two
+    // separate calls could (a second call silently failing was exactly how a removed course kept
+    // showing up in admin.html).
     try {
+      const batch = writeBatch(db);
       if (enrolledSet.has(code)) {
-        await deleteDoc(ref);
-        await deleteDoc(logRef).catch(() => {});
+        batch.delete(ref);
+        batch.delete(logRef);
+        await batch.commit();
         enrolledSet.delete(code);
       } else {
         const majorAtEnrollment = (typeof EFFECTIVE_MAJOR !== "undefined" && EFFECTIVE_MAJOR) ? EFFECTIVE_MAJOR : (answers.chosenMajor || null);
-        await setDoc(ref, {
+        batch.set(ref, {
           code,
           deptKey: found.deptKey,
           deptLabel: found.deptObj.label,
@@ -1207,14 +1213,15 @@ function renderResults(shouldScroll = true){
           journal: [],
           notesUpdatedAt: serverTimestamp()
         });
-        await setDoc(logRef, {
+        batch.set(logRef, {
           uid: user.uid,
           code,
           deptKey: found.deptKey,
           deptLabel: found.deptObj.label,
           majorAtEnrollment,
           enrolledAt: serverTimestamp()
-        }).catch((e) => console.error("Could not update admin log (non-fatal):", e));
+        });
+        await batch.commit();
         enrolledSet.add(code);
       }
     } catch (e) {
