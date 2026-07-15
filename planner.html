@@ -6,7 +6,7 @@
 <title>Williams College Course &amp; Major Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shared/styles.css?v=7">
+<link rel="stylesheet" href="shared/styles.css?v=8">
 </head>
 <body class="auth-pending">
 <div class="director-credit"><span class="credit-badge"><span class="credit-dot"></span>Directed by <strong>Yule Kwon</strong></span></div>
@@ -142,7 +142,7 @@ function subtopicQuestionsFor(){
   return DEPT_ORDER.filter(k=>answers.excites.includes(k)).map(k=>{
     const d=DEPTS[k];
     return {id:"subtopics_"+k,type:"tagpick",dept:k,
-      title:`Inside ${d.label}, what specifically pulls you in?`,
+      title:`Inside ${d.label}, what specifically pulls you in or out?`,
       sub:`Tap a topic once to flag "more of this," again for "less of this," a third time to clear it. This is what separates German Idealism from Feminist Ethics, or Photography from an Art History survey — be as picky as you want.`,
       tags:getDeptSubtopics(k)};
   });
@@ -985,7 +985,8 @@ function renderResults(shouldScroll = true){
 
   const majorKey=EFFECTIVE_MAJOR;
   document.getElementById("plan-h2").textContent = FIT_RANKING?`Curriculum Frameworks (Tracking toward ${DEPTS[majorKey].label})`:`Curriculum Architecture — ${DEPTS[majorKey].label} Major`;
-  document.getElementById("plan-sub").textContent = `6 Term Progression Blueprint · 4 Classes/Term · Starting ${TERM_LABEL[answers.start]} 2026`;
+  const startYear = answers.start==="S" ? 2027 : 2026;
+  document.getElementById("plan-sub").textContent = `6 Term Progression Blueprint · 4 Classes/Term · Starting ${TERM_LABEL[answers.start]} ${startYear}`;
 
   const fitBlock=document.getElementById("fit-block");
   if(FIT_RANKING){
@@ -1027,10 +1028,13 @@ function renderResults(shouldScroll = true){
     + `<div class="req-chip ${reqStatus.majorFinished?'ok':'info'}"><div class="label">Major Progress</div><div class="val">${Math.min(reqStatus.majorCount,reqStatus.majorGoal)}/${reqStatus.majorGoal}</div></div>`
     + (reqStatus.wantsLang ? `<div class="req-chip ${reqStatus.langCount>=reqStatus.langGoal?'ok':'info'}"><div class="label">Language</div><div class="val">${reqStatus.langCount}/${reqStatus.langGoal}</div></div>` : "");
 
-  let year=2026;
+  // Spring always falls in the calendar year AFTER the Fall it follows within the same academic
+  // year (Fall 2026 -> Spring 2027, not Spring 2026), so the year increments on entering Spring,
+  // not Fall -- and the base year itself depends on which term the student is starting in.
+  let year = answers.start==="S" ? 2027 : 2026;
   const timeline=document.getElementById("timeline");
   timeline.innerHTML=semesterPlans.map((items,i)=>{
-    if(i>0 && terms[i]==="F") year++;
+    if(i>0 && terms[i]==="S") year++;
     const label=`${TERM_LABEL[terms[i]]} ${year}`;
     if(abroadIdx.has(i)){
       return `<div class="sem-card abroad"><div class="sem-label">Semester ${i+1}</div><div class="sem-title">${label}</div>
@@ -1054,7 +1058,7 @@ function renderResults(shouldScroll = true){
         <div class="chip-actions">
           <button class="swap-action-btn" onclick="swapCourse(${i}, '${item.code}')">Swap</button>
           <button class="other-action-btn ${isOtherOpen?'active':''}" onclick="toggleCustomSwap(${i}, '${item.code}')">Other</button>
-          <button class="enroll-action-btn ${isEnrolled?'active':''}" onclick="toggleEnroll('${item.code}')">${isEnrolled?'&check; Enrolled':'Mark Enrolled'}</button>
+          <button class="enroll-action-btn ${isEnrolled?'active':''}" onclick="toggleEnroll('${item.code}', ${i})">${isEnrolled?'&check; Enrolled':'Mark Enrolled'}</button>
         </div>
       </div>`;
     }).join("");
@@ -1178,7 +1182,7 @@ function renderResults(shouldScroll = true){
     if (pendingSave) await pendingSave;
   };
 
-  window.toggleEnroll = async function (code) {
+  window.toggleEnroll = async function (code, semIdx) {
     const user = auth.currentUser;
     if (!user) return;
     const found = typeof findCourseGlobal === "function" ? findCourseGlobal(code) : null;
@@ -1202,6 +1206,10 @@ function renderResults(shouldScroll = true){
         enrolledSet.delete(code);
       } else {
         const majorAtEnrollment = (typeof EFFECTIVE_MAJOR !== "undefined" && EFFECTIVE_MAJOR) ? EFFECTIVE_MAJOR : (answers.chosenMajor || null);
+        // The actual term this slot lands on (not the course's own term, which can be "FS" and
+        // wouldn't say which specific semester it was scheduled into) -- lets my-courses.html
+        // place the course in the right box without re-deriving the whole plan.
+        const scheduledTerm = (typeof PLAN_VARIANTS !== "undefined" && PLAN_VARIANTS[activeTab] && PLAN_VARIANTS[activeTab].plan.terms[semIdx]) || found.course.term;
         batch.set(ref, {
           code,
           deptKey: found.deptKey,
@@ -1209,6 +1217,8 @@ function renderResults(shouldScroll = true){
           term: found.course.term,
           level: found.course.level,
           majorAtEnrollment,
+          semIdx: typeof semIdx === "number" ? semIdx : null,
+          scheduledTerm,
           enrolledAt: serverTimestamp(),
           journal: [],
           notesUpdatedAt: serverTimestamp()

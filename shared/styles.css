@@ -83,6 +83,17 @@ button.ghost:hover{color:var(--purple-700);}
 .major-req-block .mrb-code{font-family:var(--mono);font-size:11.5px;font-weight:600;background:var(--purple-100);color:var(--purple-900);border-radius:6px;padding:4px 9px;}
 .timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-top:16px;}
 .sem-card{background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 14px;position:relative;}
+
+/* ============ MY COURSES: PROGRESS BARS + BLANK SLOTS ============ */
+.progress-bars{display:flex;gap:20px;flex-wrap:wrap;margin:24px 0;}
+.progress-bar-block{flex:1;min-width:240px;background:var(--white);border:1px solid var(--line);border-radius:var(--radius);padding:16px 20px;}
+.progress-bar-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.progress-bar-head .pb-title{font-family:var(--serif);font-size:15px;font-weight:600;color:var(--purple-900);}
+.progress-bar-head .pb-pct{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--purple-700);}
+.progress-bar-track{height:12px;border-radius:6px;background:var(--purple-100);overflow:hidden;}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--purple-600),var(--gold));border-radius:6px;transition:width .4s ease;}
+.progress-bar-sub{font-size:11.5px;color:var(--ink-soft);margin-top:7px;}
+.course-chip.blank{border-style:dashed;background:transparent;color:var(--ink-soft);text-align:center;font-size:12px;padding:20px 12px;}
 .sem-card::before{content:"";position:absolute;top:0;left:18px;right:18px;height:3px;background:linear-gradient(90deg,var(--purple-700),var(--gold));border-radius:0 0 4px 4px;}
 .sem-card.abroad::before{background:linear-gradient(90deg,var(--gold),var(--d2));}
 .sem-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:2px;}

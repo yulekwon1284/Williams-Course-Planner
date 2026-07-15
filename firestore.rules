@@ -41,7 +41,7 @@ service cloud.firestore {
                       && code.matches('^[A-Z]{2,6}[0-9]{3}$')
                       && request.resource.data.code == code
                       && request.resource.data.keys().hasOnly(
-                           ['code', 'deptKey', 'deptLabel', 'term', 'level', 'majorAtEnrollment', 'enrolledAt', 'journal', 'notesUpdatedAt']
+                           ['code', 'deptKey', 'deptLabel', 'term', 'level', 'majorAtEnrollment', 'semIdx', 'scheduledTerm', 'enrolledAt', 'journal', 'notesUpdatedAt']
                          )
                       && request.resource.data.enrolledAt == request.time;
         // Only the journal (one entry per calendar day -- see notes.html) can change after

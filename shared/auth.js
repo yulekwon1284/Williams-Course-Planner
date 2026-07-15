@@ -119,6 +119,7 @@ export function mountNav(activePage, user) {
   nav.innerHTML = `
     <div class="nav-links">
       <a href="planner.html" class="${activePage === "planner" ? "active-link" : ""}">Planner</a>
+      <a href="my-courses.html" class="${activePage === "mycourses" ? "active-link" : ""}">My Courses</a>
       <a href="notes.html" class="${activePage === "notes" ? "active-link" : ""}">My Notes</a>
       ${isOwner ? `<a href="admin.html" class="${activePage === "admin" ? "active-link" : ""}">Admin</a>` : ""}
     </div>
