@@ -6,7 +6,7 @@
 <title>Williams College Course &amp; Major Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shared/styles.css?v=9">
+<link rel="stylesheet" href="shared/styles.css?v=10">
 </head>
 <body class="auth-pending">
 <div class="director-credit"><span class="credit-badge"><span class="credit-dot"></span>Directed by <strong>Yule Kwon</strong></span></div>
@@ -61,7 +61,7 @@
 </div>
 </div>
 
-<script src="shared/course-data.js?v=9"></script>
+<script src="shared/course-data.js?v=10"></script>
 <script>
 /* ============ QUIZ GENERATION STRUC ============ */
 let step=0;
@@ -739,6 +739,7 @@ function swapCourse(semIdx, oldCode) {
     currentSemesterList[targetIdx] = alternativeCourse;
     recomputeReqStatus(activePlanData);
     withScrollPreserved(()=>renderResults(false));
+    if(typeof triggerAutosave==="function") triggerAutosave();
   }
 }
 
@@ -857,6 +858,7 @@ function applyCustomSwap(semIdx, oldCode, newCode){
   recomputeReqStatus(activePlanData);
   customSwapOpen=null; customSwapResults=null; customSwapQuery={prefix:"",text:""}; customSwapEmptyMsg=null;
   withScrollPreserved(()=>renderResults(false));
+  if(typeof triggerAutosave==="function") triggerAutosave();
 }
 
 function renderCustomSwapPanel(semIdx, code){
@@ -908,10 +910,10 @@ function generateAllPlans(){
   PLAN_VARIANTS=configs.map(cfg=>({cfg,plan:buildOnePlan(EFFECTIVE_MAJOR,cfg)}));
   activeTab=0;
   renderResults(true);
-  // Persists answers (not the derived plan itself -- generation is deterministic, so replaying
-  // the same answers always reproduces the same suggestions) so a signed-in user's plan survives
-  // logging out and back in. Defined by the module script once the user is authenticated.
-  if(typeof onPlanGenerated==="function") onPlanGenerated();
+  // Persists the plan (answers + current per-slot snapshot) so a signed-in user's exact plan --
+  // swaps and all -- survives logging out and back in. Defined by the module script once the
+  // user is authenticated.
+  if(typeof triggerAutosave==="function") triggerAutosave();
 }
 
 const TERM_LABEL={F:"Fall",S:"Spring"};
@@ -976,6 +978,7 @@ function selectTab(i){
   activeTab=i;
   customSwapOpen=null; customSwapResults=null; customSwapQuery={prefix:"",text:""}; customSwapEmptyMsg=null;
   withScrollPreserved(()=>renderResults(false));
+  if(typeof triggerAutosave==="function") triggerAutosave();
 }
 
 function renderResults(shouldScroll = true){
@@ -1097,12 +1100,65 @@ function renderResults(shouldScroll = true){
   }
 }
 
+/* ============ PLAN STATE SNAPSHOT (for save/restore) ============
+   `answers` alone isn't enough to restore "the last thing the student saw" -- swapCourse and
+   applyCustomSwap mutate PLAN_VARIANTS in place without touching `answers`, and plan generation
+   from answers is only replayable up to the point a swap happens. This snapshot records which
+   course occupies every slot of every variant (plus which tab was open and each slot's
+   cross-listing/match flags, so reasonFor() and requirement tallies stay accurate after restore)
+   so a reload reproduces the exact plan the student left, not a freshly re-generated one. */
+function serializePlanState(){
+  if(!PLAN_VARIANTS.length) return null;
+  return {
+    activeTab,
+    variants: PLAN_VARIANTS.map(v=>v.plan.semesterPlans.map(sem=>sem.map(it=>({
+      code: it.code,
+      registeredAs: it.registeredAs || null,
+      loveMatch: !!it.loveMatch,
+      passionPick: !!it.passionPick
+    }))))
+  };
+}
+window.__serializePlanState = serializePlanState;
+
+function buildItemFromSlot(slot){
+  const found=findCourseGlobal(slot.code);
+  if(!found) return null;
+  const item={code:slot.code, dept:found.deptKey, deptLabel:found.deptObj.label, div:found.deptObj.div, course:found.course};
+  if(slot.registeredAs) item.registeredAs=slot.registeredAs;
+  if(slot.loveMatch) item.loveMatch=true;
+  if(slot.passionPick) item.passionPick=true;
+  return item;
+}
+
+// Restores a serializePlanState() snapshot onto the freshly-generated PLAN_VARIANTS baseline
+// (generateAllPlans() must already have run), overwriting each slot's course and recomputing
+// requirement tallies so a reload shows exactly what the student left, swaps included.
+function applyPlanSnapshot(snapshot){
+  if(!snapshot || !Array.isArray(snapshot.variants)) return;
+  snapshot.variants.forEach((semesterSlotLists, i)=>{
+    const variant=PLAN_VARIANTS[i];
+    if(!variant || !Array.isArray(semesterSlotLists)) return;
+    const planData=variant.plan;
+    semesterSlotLists.forEach((slots, semIdx)=>{
+      if(planData.abroadIdx.has(semIdx) || !Array.isArray(slots) || semIdx>=planData.semesterPlans.length) return;
+      planData.semesterPlans[semIdx]=slots.map(buildItemFromSlot).filter(Boolean);
+    });
+    recomputeReqStatus(planData);
+  });
+  if(typeof snapshot.activeTab==="number" && snapshot.activeTab>=0 && snapshot.activeTab<PLAN_VARIANTS.length){
+    activeTab=snapshot.activeTab;
+  }
+  renderResults(false);
+}
+window.__applyPlanSnapshot = applyPlanSnapshot;
+
 /* No unconditional renderQuiz() call here -- the module script below decides whether to show a
    fresh quiz or resume a previously saved plan once it knows the signed-in user's saved state. */
 
 </script>
 <script type="module">
-  import { auth, db, requireLogin, mountNav } from "./shared/auth.js?v=9";
+  import { auth, db, requireLogin, mountNav } from "./shared/auth.js?v=10";
   import {
     doc, getDoc, setDoc, deleteDoc, collection, getDocs, serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -1110,13 +1166,19 @@ function renderResults(shouldScroll = true){
   requireLogin(async (user) => {
     mountNav("planner", user);
     await loadEnrollments(user.uid);
-    const savedAnswers = await loadPlanState(user.uid);
-    if (savedAnswers) {
-      // Plan generation is a pure function of `answers` (no randomness anywhere in
-      // buildOnePlan/scoreMajorFit), so replaying the saved answers reproduces the exact same
-      // suggestions the user last saw, without needing to store the derived plan itself.
-      Object.assign(answers, savedAnswers);
+    const saved = await loadPlanState(user.uid);
+    if (saved) {
+      Object.assign(answers, saved.answers);
+      // generateAllPlans() (and swapCourse/applyCustomSwap/selectTab) fire triggerAutosave() on
+      // every call -- suppress it while we're still reconstructing the saved state, otherwise the
+      // freshly-regenerated *unswapped* baseline plan would overwrite the real saved snapshot in
+      // Firestore before applyPlanSnapshot() below gets a chance to restore it.
+      window.__restoringPlan = true;
       generateAllPlans();
+      if (saved.planSnapshot && typeof window.__applyPlanSnapshot === "function") {
+        window.__applyPlanSnapshot(saved.planSnapshot);
+      }
+      window.__restoringPlan = false;
     } else {
       renderQuiz();
     }
@@ -1130,7 +1192,7 @@ function renderResults(shouldScroll = true){
   async function loadPlanState(uid) {
     try {
       const snap = await getDoc(doc(db, "users", uid, "planState", "current"));
-      if (snap.exists() && snap.data().answers) return snap.data().answers;
+      if (snap.exists() && snap.data().answers) return snap.data();
     } catch (e) {
       console.error("Could not load saved plan state:", e);
     }
@@ -1146,11 +1208,13 @@ function renderResults(shouldScroll = true){
 
   async function savePlanState() {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user || window.__restoringPlan) return;
     setSaveStatus("Saving your plan…", false);
     try {
+      const planSnapshot = (typeof window.__serializePlanState === "function") ? window.__serializePlanState() : null;
       await setDoc(doc(db, "users", user.uid, "planState", "current"), {
         answers,
+        planSnapshot,
         updatedAt: serverTimestamp()
       });
       setSaveStatus("Saved just now — safe to close this page", false);
@@ -1165,9 +1229,10 @@ function renderResults(shouldScroll = true){
   // shared/auth.js mountNav, which calls window.__beforeNavigateAway before navigating).
   let pendingSave = null;
 
-  // Called from the classic script's generateAllPlans() every time plans are (re)built, so the
-  // signed-in user's latest answers are always what gets restored on their next visit.
-  window.onPlanGenerated = function () {
+  // Called from the classic script whenever the plan changes shape -- full regeneration, a swap,
+  // an "Other" pick, or a tab switch -- so the signed-in user's exact plan (not just their quiz
+  // answers) is always what gets restored on their next visit.
+  window.triggerAutosave = function () {
     pendingSave = savePlanState().catch(() => {});
   };
 

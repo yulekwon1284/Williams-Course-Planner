@@ -44,15 +44,20 @@ service cloud.firestore {
                            ['code', 'deptKey', 'deptLabel', 'term', 'level', 'majorAtEnrollment', 'semIdx', 'scheduledTerm', 'enrolledAt', 'journal', 'notesUpdatedAt']
                          )
                       && request.resource.data.enrolledAt == request.time;
-        // Only the journal (one entry per calendar day -- see notes.html) can change after
-        // creation -- course code, dept, term, level, and the original enrollment timestamp are
-        // locked in at creation time. Capped at 400 entries (over a year of daily notes) as a
-        // sanity bound; serverTimestamp() isn't usable inside array elements, so per-entry
-        // timestamps are client-generated and not otherwise validated here.
+        // The journal (one entry per calendar day -- see notes.html) and the semester slot
+        // (semIdx/scheduledTerm -- drag-and-drop rescheduling on my-courses.html) can change after
+        // creation; course code, dept, level, and the original enrollment timestamp are locked in
+        // at creation time. Journal capped at 400 entries (over a year of daily notes) as a sanity
+        // bound; serverTimestamp() isn't usable inside array elements, so per-entry timestamps are
+        // client-generated and not otherwise validated here. semIdx is either null (unscheduled)
+        // or one of the 6 slots in the 6-term plan; scheduledTerm always accompanies it.
         allow update: if isOwner(uid)
-                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['journal', 'notesUpdatedAt'])
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['journal', 'notesUpdatedAt', 'semIdx', 'scheduledTerm'])
                       && request.resource.data.journal is list
-                      && request.resource.data.journal.size() < 400;
+                      && request.resource.data.journal.size() < 400
+                      && (request.resource.data.semIdx == null ||
+                          (request.resource.data.semIdx is int && request.resource.data.semIdx >= 0 && request.resource.data.semIdx <= 5))
+                      && request.resource.data.scheduledTerm in ['F', 'S'];
         allow delete: if isOwner(uid);
       }
 

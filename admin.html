@@ -6,7 +6,7 @@
 <title>Admin &mdash; Williams College Course &amp; Major Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shared/styles.css?v=9">
+<link rel="stylesheet" href="shared/styles.css?v=10">
 </head>
 <body class="auth-pending">
 <div class="director-credit"><span class="credit-badge"><span class="credit-dot"></span>Directed by <strong>Yule Kwon</strong></span></div>
@@ -38,10 +38,10 @@
 </div>
 </div>
 
-<script src="shared/course-data.js?v=9"></script>
+<script src="shared/course-data.js?v=10"></script>
 <script type="module">
-  import { auth, db, requireLogin, mountNav } from "./shared/auth.js?v=9";
-  import { OWNER_UID } from "./shared/firebase-config.js?v=9";
+  import { auth, db, requireLogin, mountNav } from "./shared/auth.js?v=10";
+  import { OWNER_UID } from "./shared/firebase-config.js?v=10";
   import { collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   requireLogin(async (user) => {

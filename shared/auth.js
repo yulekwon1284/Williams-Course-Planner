@@ -13,7 +13,7 @@ import {
 import {
   getFirestore, doc, setDoc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { FIREBASE_CONFIG, USERNAME_EMAIL_DOMAIN, OWNER_UID } from "./firebase-config.js?v=9";
+import { FIREBASE_CONFIG, USERNAME_EMAIL_DOMAIN, OWNER_UID } from "./firebase-config.js?v=10";
 
 const app = initializeApp(FIREBASE_CONFIG);
 export const auth = getAuth(app);

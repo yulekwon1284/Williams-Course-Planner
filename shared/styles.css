@@ -94,6 +94,9 @@ button.ghost:hover{color:var(--purple-700);}
 .progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--purple-600),var(--gold));border-radius:6px;transition:width .4s ease;}
 .progress-bar-sub{font-size:11.5px;color:var(--ink-soft);margin-top:7px;}
 .course-chip.blank{border-style:dashed;background:transparent;color:var(--ink-soft);text-align:center;font-size:12px;padding:20px 12px;}
+.course-chip[draggable="true"]{cursor:grab;}
+.course-chip[draggable="true"]:active{cursor:grabbing;}
+.course-chip.blank.drag-over{border-color:var(--purple-600);border-style:solid;background:var(--purple-100);color:var(--purple-700);font-weight:600;}
 .sem-card::before{content:"";position:absolute;top:0;left:18px;right:18px;height:3px;background:linear-gradient(90deg,var(--purple-700),var(--gold));border-radius:0 0 4px 4px;}
 .sem-card.abroad::before{background:linear-gradient(90deg,var(--gold),var(--d2));}
 .sem-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:2px;}

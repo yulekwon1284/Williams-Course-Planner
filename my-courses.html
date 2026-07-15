@@ -6,7 +6,7 @@
 <title>My Courses &mdash; Williams College Course &amp; Major Planner</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="shared/styles.css?v=9">
+<link rel="stylesheet" href="shared/styles.css?v=10">
 </head>
 <body class="auth-pending">
 <div class="director-credit"><span class="credit-badge"><span class="credit-dot"></span>Directed by <strong>Yule Kwon</strong></span></div>
@@ -41,16 +41,24 @@
 </div>
 </div>
 
-<script src="shared/course-data.js?v=9"></script>
+<script src="shared/course-data.js?v=10"></script>
 <script type="module">
-  import { auth, db, requireLogin, mountNav } from "./shared/auth.js?v=9";
+  import { auth, db, requireLogin, mountNav } from "./shared/auth.js?v=10";
   import {
-    doc, getDoc, collection, getDocs
+    doc, getDoc, updateDoc, collection, getDocs
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const DIV_KEY = { I: "D1", II: "D2", III: "D3" };
   const TERM_LABEL = { F: "Fall", S: "Spring" };
   const SEM_COUNT = 6;
+
+  // Stashed by render() so the drag-and-drop handlers (which fire from inline HTML attributes,
+  // outside render()'s own scope) can look up which course was dragged and what semester/term a
+  // drop target actually represents.
+  let currentPlanAnswers = null;
+  let currentEnrollments = [];
+  let currentLabels = [];
+  let currentMajorKey = null;
 
   function escapeHtml(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({
@@ -99,6 +107,11 @@
     const majorKey = planAnswers && planAnswers.chosenMajor && planAnswers.hasMajor === "yes" ? planAnswers.chosenMajor : null;
     const startTerm = planAnswers && planAnswers.start === "S" ? "S" : "F";
     const labels = semesterLabels(startTerm);
+
+    currentPlanAnswers = planAnswers;
+    currentEnrollments = enrollments;
+    currentLabels = labels;
+    currentMajorKey = majorKey;
 
     renderProgress(majorKey, enrollments);
     renderTimeline(labels, enrollments, majorKey);
@@ -168,7 +181,7 @@
       const items = bySlot[i] || [];
       let body = items.map((e) => courseChipHtml(e, majorKey)).join("");
       for (let e = items.length; e < 4; e++) {
-        body += `<div class="course-chip blank">Not yet enrolled</div>`;
+        body += `<div class="course-chip blank" ondragover="onSlotDragOver(event)" ondragenter="onSlotDragEnter(event)" ondragleave="onSlotDragLeave(event)" ondrop="onSlotDrop(event, ${i})">Drag a course here</div>`;
       }
       return `<div class="sem-card"><div class="sem-label">Semester ${i + 1}</div><div class="sem-title">${escapeHtml(slot.label)}</div>${body}</div>`;
     }).join("");
@@ -192,12 +205,56 @@
     const tagHtml = (divNum ? [`<span class="tag div${divNum}">D${divNum}</span>`] : []).concat(attrs.map((a) => `<span class="tag ${a.toLowerCase()}">${a}</span>`)).join("");
     const codeLabel = e.code.replace(/([A-Z]+)(\d+)/, "$1 $2");
     const countsForMajor = found && (found.deptKey === majorKey || (found.course.cross || []).some((cx) => cx.deptKey === majorKey));
-    return `<div class="course-chip">
+    return `<div class="course-chip" draggable="true" ondragstart="onChipDragStart(event, '${e.code}')">
       <div class="code">${escapeHtml(codeLabel)} <span class="tags">${tagHtml}</span></div>
       <div class="name">${escapeHtml(name)}</div>
       <div class="why">${escapeHtml(e.deptLabel || "")}${countsForMajor ? " &middot; counts toward your major" : ""}</div>
     </div>`;
   }
+
+  window.onChipDragStart = function (e, code) {
+    e.dataTransfer.setData("text/plain", code);
+    e.dataTransfer.effectAllowed = "move";
+  };
+  window.onSlotDragOver = function (e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+  window.onSlotDragEnter = function (e) {
+    e.preventDefault();
+    e.currentTarget.classList.add("drag-over");
+  };
+  window.onSlotDragLeave = function (e) {
+    e.currentTarget.classList.remove("drag-over");
+  };
+  window.onSlotDrop = async function (e, slotIdx) {
+    e.preventDefault();
+    e.currentTarget.classList.remove("drag-over");
+    const code = e.dataTransfer.getData("text/plain");
+    const entry = currentEnrollments.find((x) => x.code === code);
+    if (!entry || !currentLabels[slotIdx]) return;
+    if (entry.semIdx === slotIdx) return;
+
+    const prevSemIdx = entry.semIdx;
+    const prevScheduledTerm = entry.scheduledTerm;
+    const targetTerm = currentLabels[slotIdx].term;
+    entry.semIdx = slotIdx;
+    entry.scheduledTerm = targetTerm;
+    renderTimeline(currentLabels, currentEnrollments, currentMajorKey);
+
+    try {
+      await updateDoc(doc(db, "users", auth.currentUser.uid, "enrollments", code), {
+        semIdx: slotIdx,
+        scheduledTerm: targetTerm
+      });
+    } catch (err) {
+      console.error("Could not save new semester for this course:", err);
+      alert("Couldn't save that placement right now — check your connection and try again.");
+      entry.semIdx = prevSemIdx;
+      entry.scheduledTerm = prevScheduledTerm;
+      renderTimeline(currentLabels, currentEnrollments, currentMajorKey);
+    }
+  };
 </script>
 </body>
 </html>
